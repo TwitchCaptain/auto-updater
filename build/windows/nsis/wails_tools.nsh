@@ -236,14 +236,14 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
     
 !macroend
 
-!macro CUSTOM_PROTOCOL_ASSOCIATE PROTOCOL DESCRIPTION ICON COMMAND
+!macro CUSTOM_PROTOCOL_ASSOCIATE PROTOCOL DESCRIPTION ICON
   DeleteRegKey SHELL_CONTEXT "Software\Classes\${PROTOCOL}"
   WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}" "" "${DESCRIPTION}"
   WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}" "URL Protocol" ""
   WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}\DefaultIcon" "" "${ICON}"
   WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}\shell" "" ""
   WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}\shell\open" "" ""
-  WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}\shell\open\command" "" "${COMMAND}"
+  WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}\shell\open\command" "" '"$INSTDIR\${PRODUCT_EXECUTABLE}" "%1"'
 !macroend
 
 !macro CUSTOM_PROTOCOL_UNASSOCIATE PROTOCOL

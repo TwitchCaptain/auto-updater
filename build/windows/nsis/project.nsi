@@ -100,7 +100,7 @@ Section "Captain Updater" SecCore
 
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols
-    !insertmacro CUSTOM_PROTOCOL_ASSOCIATE "captainupdater" "URL:Captain Updater Protocol" "$INSTDIR\${PRODUCT_EXECUTABLE}" '"$INSTDIR\${PRODUCT_EXECUTABLE}" "%1"'
+    !insertmacro CUSTOM_PROTOCOL_ASSOCIATE "captainupdater" "URL:Captain Updater Protocol" "$INSTDIR\${PRODUCT_EXECUTABLE}"
 
     WriteRegStr SHELL_CONTEXT "Software\Classes\AppUserModelId\TwitchCaptain.CaptainUpdater" "DisplayName" "Captain Updater"
     WriteRegStr SHELL_CONTEXT "Software\Classes\AppUserModelId\TwitchCaptain.CaptainUpdater" "IconUri" "$INSTDIR\${PRODUCT_EXECUTABLE}"
