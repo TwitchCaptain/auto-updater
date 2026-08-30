@@ -20,8 +20,19 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      # Wails on Linux pulls GTK/WebKit via CGO. Unit tests stay native; the
+      # GUI package and the Windows binary are compile-checked with GOOS=windows.
       - name: go-test
-        run: go test -race -covermode=atomic '-test.v' ./...
+        if: matrix.os != 'ubuntu'
+        run: go test -race -covermode=atomic '-test.v' ./internal/...
+      - name: go-test
+        if: matrix.os == 'ubuntu'
+        run: |
+          set -euo pipefail
+          mapfile -t pkgs < <(go list ./internal/... | grep -v '/internal/service$')
+          go test -race -covermode=atomic '-test.v' "${pkgs[@]}"
+          GOOS=windows CGO_ENABLED=0 go test -c -o /dev/null ./internal/service
+          GOOS=windows CGO_ENABLED=0 go build -o /dev/null .
   golangci:
     name: golangci-lint
     runs-on: ubuntu-latest

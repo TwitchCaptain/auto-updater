@@ -36,11 +36,17 @@ jobs:
           go install github.com/go-task/task/v3/cmd/task@v3.45.4
           WAILS_VER="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
           go install "github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VER}"
-      - name: Fail closed without codesign
+      - name: Fail closed without codesign and GoReleaser Pro
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_PRO_KEY }}
         run: |
           set -euo pipefail
           if [ -z "${CODESIGN_URL:-}" ]; then
             echo "CODESIGN_URL must be set in CI" >&2
+            exit 1
+          fi
+          if [ -z "${GORELEASER_KEY:-}" ]; then
+            echo "GORELEASER_PRO_KEY must be set in CI" >&2
             exit 1
           fi
       - name: Install golift codesign
