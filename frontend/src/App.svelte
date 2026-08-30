@@ -46,6 +46,8 @@
     notes: string;
   };
   type Shortcut = { target: string; arguments: string; workingDir: string; icon: string; description: string };
+  type Upcoming = { time: string; appId: string; appName: string; action: string };
+  type Page = 'apps' | 'activity' | 'settings';
 
   const days = [
     { n: 0, l: 'Sun' },
@@ -57,7 +59,7 @@
     { n: 6, l: 'Sat' },
   ];
 
-  let page = $state<'apps' | 'history' | 'settings'>('apps');
+  let page = $state<Page>('apps');
   let locked = $state(false);
   let encrypted = $state(false);
   let password = $state('');
@@ -66,7 +68,8 @@
   let preview = $state<Preview | null>(null);
   let localVer = $state('');
   let shortcut = $state<Shortcut | null>(null);
-  let history = $state<Hist[]>([]);
+  let past = $state<Hist[]>([]);
+  let upcoming = $state<Upcoming[]>([]);
   let presets = $state<Preset[]>([]);
   let err = $state('');
   let busy = $state('');
@@ -80,9 +83,35 @@
       .map((s) => s.trim())
       .filter(Boolean),
   );
+  const pastNewest = $derived((past ?? []).toReversed());
+
+  function go(next: Page) {
+    page = next;
+    if (next === 'activity') void refresh();
+  }
+
+  function formatWhen(iso: string) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso || '';
+    return d.toLocaleString();
+  }
+
+  function actionLabel(a: string) {
+    if (a === 'upgrade') return 'Upgrade';
+    if (a === 'notify') return 'Notify';
+    if (a === 'check') return 'Check';
+    if (a === 'error') return 'Error';
+    return a;
+  }
+
+  function openApp(id: string) {
+    const a = settings.apps.find((x) => x.id === id);
+    page = 'apps';
+    if (a) pick(a);
+  }
 
   const emptyApp = (): AppRow => ({
-    id: '',
+    id: crypto.randomUUID(),
     name: '',
     enabled: true,
     source: 'github',
@@ -91,6 +120,16 @@
     extraFiles: [],
     schedules: [],
   });
+
+  function fail(e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(e);
+    err = msg;
+  }
+
+  function cloneApp(a: AppRow): AppRow {
+    return JSON.parse(JSON.stringify(a)) as AppRow;
+  }
 
   async function refreshWouldWrite() {
     if (!selected) {
@@ -101,12 +140,17 @@
   }
 
   async function refresh() {
-    locked = await Service.NeedsUnlock();
-    encrypted = await Service.Encrypted();
-    if (locked) return;
-    settings = await Service.GetConfig();
-    history = await Service.History(200);
-    presets = await Service.Presets();
+    try {
+      locked = await Service.NeedsUnlock();
+      encrypted = await Service.Encrypted();
+      if (locked) return;
+      settings = await Service.GetConfig();
+      past = (await Service.History(200)) ?? [];
+      upcoming = (await Service.Upcoming()) ?? [];
+      presets = await Service.Presets();
+    } catch (e) {
+      fail(e);
+    }
   }
 
   async function unlock() {
@@ -116,38 +160,71 @@
       password = '';
       await refresh();
     } catch (e) {
-      err = String(e);
+      fail(e);
     }
   }
 
   async function saveAll() {
     err = '';
-    await Service.SaveConfig(settings);
-    await refresh();
+    try {
+      await Service.SaveConfig(settings);
+      await refresh();
+    } catch (e) {
+      fail(e);
+    }
   }
 
   async function saveApp() {
-    if (!selected) return;
+    if (!selected || busy) return;
     err = '';
     selected.extraFiles = extraList;
     busy = 'Saving…';
     try {
-      await Service.SaveApp(selected);
+      const saved = await Service.SaveApp(selected);
+      selected.id = saved.id;
       await refresh();
-      const id = selected.id;
-      selected = settings.apps.find((a) => a.id === id) ?? selected;
+      const found = settings.apps.find((a) => a.id === saved.id);
+      selected = found ? cloneApp(found) : selected;
     } catch (e) {
-      err = String(e);
+      fail(e);
     } finally {
       busy = '';
     }
   }
 
   async function removeApp() {
-    if (!selected?.id) return;
-    await Service.DeleteApp(selected.id);
-    selected = null;
-    await refresh();
+    if (!selected) return;
+    const id = selected.id;
+    if (!id || !settings.apps.some((a) => a.id === id)) {
+      selected = null;
+      preview = null;
+      localVer = '';
+      extraText = '';
+      wouldWrite = [];
+      return;
+    }
+    await removeAppById(id);
+  }
+
+  async function removeAppById(id: string) {
+    err = '';
+    if (!id) {
+      err = 'This app has no id. Discard it with Delete, or save it first.';
+      return;
+    }
+    try {
+      await Service.DeleteApp(id);
+      if (selected?.id === id) {
+        selected = null;
+        preview = null;
+        localVer = '';
+        extraText = '';
+        wouldWrite = [];
+      }
+      await refresh();
+    } catch (e) {
+      fail(e);
+    }
   }
 
   async function doPreview() {
@@ -156,10 +233,14 @@
     busy = 'Checking GitHub…';
     try {
       preview = await Service.PreviewGitHub(selected.ownerRepo);
-      localVer = await Service.LocalVersion(selected);
+      try {
+        localVer = await Service.LocalVersion(selected);
+      } catch {
+        localVer = '';
+      }
       await refreshWouldWrite();
     } catch (e) {
-      err = String(e);
+      fail(e);
       preview = null;
     } finally {
       busy = '';
@@ -183,7 +264,7 @@
       wouldWrite = r.wouldWrite || wouldWrite;
       await refresh();
     } catch (e) {
-      err = String(e);
+      fail(e);
     } finally {
       busy = '';
     }
@@ -201,7 +282,7 @@
       await refresh();
       await doPreview();
     } catch (e) {
-      err = String(e);
+      fail(e);
     } finally {
       busy = '';
     }
@@ -236,23 +317,27 @@
   }
 
   async function applyPreset(id: string) {
-    const a = await Service.ApplyPreset(id);
-    selected = {
-      id: '',
-      name: a.name,
-      enabled: true,
-      source: 'github',
-      ownerRepo: a.ownerRepo,
-      exePath: a.exePath || '',
-      extraFiles: a.extraFiles || [],
-      versionHttp: a.versionHttp,
-      versionJson: a.versionJson,
-      schedules: [],
-    };
-    extraText = (selected.extraFiles || []).join('\n');
-    preview = null;
-    page = 'apps';
-    await refreshWouldWrite();
+    try {
+      const a = await Service.ApplyPreset(id);
+      selected = {
+        id: crypto.randomUUID(),
+        name: a.name,
+        enabled: true,
+        source: 'github',
+        ownerRepo: a.ownerRepo,
+        exePath: a.exePath || '',
+        extraFiles: a.extraFiles || [],
+        versionHttp: a.versionHttp,
+        versionJson: a.versionJson,
+        schedules: [],
+      };
+      extraText = (selected.extraFiles || []).join('\n');
+      preview = null;
+      page = 'apps';
+      await refreshWouldWrite();
+    } catch (e) {
+      fail(e);
+    }
   }
 
   function addSchedule() {
@@ -267,15 +352,19 @@
   }
 
   function pick(a: AppRow, focusUpgrade = false) {
-    selected = structuredClone(a);
-    extraText = (a.extraFiles || []).join('\n');
-    preview = null;
-    localVer = a.lastVersion || '';
-    highlightUpgrade = focusUpgrade;
-    void loadLnk();
-    void doPreview();
-    if (focusUpgrade) {
-      queueMicrotask(() => document.getElementById('upgrade-btn')?.focus());
+    try {
+      selected = cloneApp(a);
+      extraText = (a.extraFiles || []).join('\n');
+      preview = null;
+      localVer = a.lastVersion || '';
+      highlightUpgrade = focusUpgrade;
+      void loadLnk();
+      void doPreview();
+      if (focusUpgrade) {
+        queueMicrotask(() => document.getElementById('upgrade-btn')?.focus());
+      }
+    } catch (e) {
+      fail(e);
     }
   }
 
@@ -286,7 +375,7 @@
       password = '';
       await refresh();
     } catch (e) {
-      err = String(e);
+      fail(e);
     }
   }
 
@@ -297,11 +386,15 @@
       password = '';
       await refresh();
     } catch (e) {
-      err = String(e);
+      fail(e);
     }
   }
 
   onMount(() => {
+    const onErr = (e: ErrorEvent) => fail(e.error ?? e.message);
+    const onRej = (e: PromiseRejectionEvent) => fail(e.reason);
+    window.addEventListener('error', onErr);
+    window.addEventListener('unhandledrejection', onRej);
     Events.On('open-app', (v: { data?: string }) => {
       const id = v?.data;
       if (!id) return;
@@ -310,7 +403,8 @@
       if (a) pick(a, true);
     });
     Events.On('history-updated', () => {
-      void Service.History(200).then((h) => (history = h));
+      void Service.History(200).then((h) => (past = h ?? []));
+      void Service.Upcoming().then((u) => (upcoming = u ?? []));
     });
     Events.On('files-dropped', (v: { data?: string[] }) => {
       const files = v?.data || [];
@@ -324,6 +418,10 @@
       void refreshWouldWrite();
     });
     void refresh();
+    return () => {
+      window.removeEventListener('error', onErr);
+      window.removeEventListener('unhandledrejection', onRej);
+    };
   });
 </script>
 
@@ -343,17 +441,29 @@
     </form>
   </div>
 {:else}
-  <nav class="navbar navbar-expand-md navbar-dark bg-primary mb-3">
+  <nav class="navbar navbar-expand navbar-dark bg-primary mb-3">
     <div class="container-fluid">
       <span class="navbar-brand">Captain Updater</span>
-      <div class="navbar-nav">
-        <button class={['nav-link', 'btn', 'btn-link', { active: page === 'apps' }]} onclick={() => (page = 'apps')}>
+      <div class="navbar-nav flex-row">
+        <button
+          type="button"
+          class={['nav-link', 'btn', 'btn-link', { active: page === 'apps' }]}
+          onclick={() => go('apps')}
+        >
           Apps
         </button>
-        <button class={['nav-link', 'btn', 'btn-link', { active: page === 'history' }]} onclick={() => (page = 'history')}>
-          History
+        <button
+          type="button"
+          class={['nav-link', 'btn', 'btn-link', { active: page === 'activity' }]}
+          onclick={() => go('activity')}
+        >
+          Activity
         </button>
-        <button class={['nav-link', 'btn', 'btn-link', { active: page === 'settings' }]} onclick={() => (page = 'settings')}>
+        <button
+          type="button"
+          class={['nav-link', 'btn', 'btn-link', { active: page === 'settings' }]}
+          onclick={() => go('settings')}
+        >
           Settings
         </button>
       </div>
@@ -380,14 +490,34 @@
             >
           </div>
           <div class="list-group mb-3">
-            {#each settings.apps as a (a.id)}
-              <button
-                class={['list-group-item', 'list-group-item-action', { active: selected?.id === a.id }]}
-                onclick={() => pick(a)}
+            {#each settings.apps as a, i (a.id || `row-${i}`)}
+              <div
+                class={[
+                  'list-group-item',
+                  'd-flex',
+                  'align-items-start',
+                  'gap-2',
+                  { active: selected?.id === a.id },
+                ]}
               >
-                <div class="fw-semibold">{a.name}</div>
-                <small class="text-body-secondary">{a.ownerRepo}</small>
-              </button>
+                <button
+                  type="button"
+                  class="btn btn-link text-start flex-grow-1 text-decoration-none p-0 text-reset"
+                  onclick={() => pick(a)}
+                >
+                  <div class="fw-semibold">{a.name}</div>
+                  <small class="text-body-secondary">{a.ownerRepo}</small>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-danger"
+                  title="Delete"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    void removeAppById(a.id);
+                  }}>×</button
+                >
+              </div>
             {/each}
             {#if settings.apps.length === 0}
               <div class="list-group-item text-body-secondary">No apps yet. Add one or use a template.</div>
@@ -407,19 +537,27 @@
             <div class="card">
               <div class="card-body">
                 <div class="row g-2">
-                  <div class="col-md-6">
+                  <div class="col-12">
                     <label class="form-label" for="app-name">Name</label>
-                    <input id="app-name" class="form-control" bind:value={selected.name} />
-                  </div>
-                  <div class="col-md-6 form-check mt-4">
-                    <input class="form-check-input" type="checkbox" id="en" bind:checked={selected.enabled} />
-                    <label class="form-check-label" for="en">Enabled</label>
+                    <div class="input-group">
+                      <div class="input-group-text" title="Enabled">
+                        <input
+                          id="en"
+                          class="form-check-input mt-0 me-2"
+                          type="checkbox"
+                          bind:checked={selected.enabled}
+                          aria-label="Enabled"
+                        />
+                        <label class="mb-0" for="en">Enabled</label>
+                      </div>
+                      <input id="app-name" class="form-control" bind:value={selected.name} />
+                    </div>
                   </div>
                   <div class="col-12">
                     <label class="form-label" for="owner-repo">GitHub repo (owner/name)</label>
                     <div class="input-group">
                       <input id="owner-repo" class="form-control" bind:value={selected.ownerRepo} onchange={() => doPreview()} />
-                      <button class="btn btn-outline-info" onclick={() => doPreview()}>Check repo</button>
+                      <button type="button" class="btn btn-outline-info" onclick={() => doPreview()}>Check repo</button>
                     </div>
                   </div>
                   {#if preview}
@@ -547,16 +685,21 @@
                 >
 
                 <div class="mt-3 d-flex gap-2 flex-wrap">
-                  <button class="btn btn-primary" onclick={() => saveApp()}>Save</button>
-                  <button class="btn btn-info" disabled={!selected.id} onclick={() => checkNow()}>Check now</button>
+                  <button type="button" class="btn btn-primary" disabled={!!busy} onclick={() => saveApp()}>Save</button>
+                  <button type="button" class="btn btn-info" disabled={!selected.id || !!busy} onclick={() => checkNow()}
+                    >Check now</button
+                  >
                   <button
                     id="upgrade-btn"
+                    type="button"
                     class={['btn', 'btn-warning', { 'shadow-lg': highlightUpgrade }]}
-                    disabled={!selected.id}
+                    disabled={!selected.id || !!busy}
                     onclick={() => upgradeNow()}>Upgrade</button
                   >
-                  <button class="btn btn-outline-danger ms-auto" disabled={!selected.id} onclick={() => removeApp()}
-                    >Delete</button
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger ms-auto"
+                    onclick={() => removeApp()}>Delete</button
                   >
                 </div>
               </div>
@@ -568,7 +711,37 @@
       </div>
     {/if}
 
-    {#if page === 'history'}
+    {#if page === 'activity'}
+      <h2 class="h5">Upcoming</h2>
+      <div class="table-responsive mb-4">
+        <table class="table table-sm table-striped">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>App</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each upcoming as u (`${u.time}-${u.appId}-${u.action}`)}
+              <tr>
+                <td class="text-nowrap">{formatWhen(u.time)}</td>
+                <td>
+                  <button type="button" class="btn btn-link btn-sm p-0 align-baseline" onclick={() => openApp(u.appId)}>
+                    {u.appName}
+                  </button>
+                </td>
+                <td>{actionLabel(u.action)}</td>
+              </tr>
+            {:else}
+              <tr>
+                <td colspan="3" class="text-body-secondary text-center py-4">- No upcoming actions -</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+
       <h2 class="h5">History</h2>
       <div class="table-responsive">
         <table class="table table-sm table-striped">
@@ -583,14 +756,18 @@
             </tr>
           </thead>
           <tbody>
-            {#each [...history].reverse() as h, i (`${h.time}-${h.appId}-${h.action}-${i}`)}
+            {#each pastNewest as h (`${h.time}-${h.appId}-${h.action}-${h.from}-${h.to}-${h.error}`)}
               <tr>
-                <td class="text-nowrap">{h.time}</td>
+                <td class="text-nowrap">{formatWhen(h.time)}</td>
                 <td>{h.appName}</td>
-                <td>{h.action}</td>
+                <td>{actionLabel(h.action)}</td>
                 <td>{h.from || ''}</td>
                 <td>{h.to || ''}</td>
                 <td class="small">{h.error || h.result || h.asset || ''}</td>
+              </tr>
+            {:else}
+              <tr>
+                <td colspan="6" class="text-body-secondary text-center py-4">- No history yet -</td>
               </tr>
             {/each}
           </tbody>
@@ -614,8 +791,8 @@
 
         <h3 class="h6">Password protection</h3>
         <p class="small text-body-secondary">
-          Encrypts config.json (tokens and paths). History stays plaintext. A forgotten password means resetting config, not
-          history.
+          Encrypts config.json (tokens and paths). The activity log stays plaintext. A forgotten password means resetting
+          config, not the log.
         </p>
         {#if encrypted}
           <p class="text-success">Encryption is on.</p>

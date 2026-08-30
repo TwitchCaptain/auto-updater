@@ -63,5 +63,41 @@ export class CheckResult {
     }
 }
 
+/**
+ * UpcomingItem is the next fire of one enabled app schedule.
+ */
+export class UpcomingItem {
+    "time": string;
+    "appId": string;
+    "appName": string;
+    "action": string;
+
+    /** Creates a new UpcomingItem instance. */
+    constructor($$source: Partial<UpcomingItem> = {}) {
+        if (!("time" in $$source)) {
+            this["time"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("appId" in $$source)) {
+            this["appId"] = "";
+        }
+        if (!("appName" in $$source)) {
+            this["appName"] = "";
+        }
+        if (!("action" in $$source)) {
+            this["action"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new UpcomingItem instance from a string or object.
+     */
+    static createFrom($$source: any = {}): UpcomingItem {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new UpcomingItem($$parsedSource as Partial<UpcomingItem>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);

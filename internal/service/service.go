@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -118,9 +119,9 @@ func (s *Service) SaveConfig(in config.Settings) error {
 	return nil
 }
 
-func (s *Service) SaveApp(app config.App) error {
+func (s *Service) SaveApp(app config.App) (config.App, error) {
 	if err := s.requireOpen(); err != nil {
-		return err
+		return config.App{}, err
 	}
 
 	return s.store.PatchApp(app)
@@ -131,17 +132,7 @@ func (s *Service) DeleteApp(id string) error {
 		return err
 	}
 
-	set := s.store.Settings()
-	out := set.Apps[:0]
-	for _, a := range set.Apps {
-		if a.ID != id {
-			out = append(out, a)
-		}
-	}
-
-	set.Apps = out
-
-	return s.store.Replace(set)
+	return s.store.DeleteApp(id)
 }
 
 func (s *Service) Presets() []preset.Info {
@@ -173,6 +164,14 @@ func (s *Service) LocalVersion(app config.App) (string, error) {
 type CheckResult struct {
 	upgrade.Result
 	AppID string `json:"appId"`
+}
+
+// UpcomingItem is the next fire of one enabled app schedule.
+type UpcomingItem struct {
+	Time    time.Time `json:"time"`
+	AppID   string    `json:"appId"`
+	AppName string    `json:"appName"`
+	Action  string    `json:"action"`
 }
 
 func (s *Service) CheckNow(id string) (*CheckResult, error) {
@@ -247,7 +246,47 @@ func (s *Service) History(limit int) ([]history.Event, error) {
 		limit = 200
 	}
 
-	return s.hist.Tail(limit)
+	events, err := s.hist.Tail(limit)
+	if events == nil {
+		events = []history.Event{}
+	}
+
+	return events, err
+}
+
+func (s *Service) Upcoming() ([]UpcomingItem, error) {
+	if err := s.requireOpen(); err != nil {
+		return nil, err
+	}
+
+	set := s.store.Settings()
+	now := time.Now()
+	items := make([]UpcomingItem, 0)
+
+	for _, app := range set.Apps {
+		if !app.Enabled {
+			continue
+		}
+
+		for _, p := range schedule.NextEach(app.Schedules, now) {
+			items = append(items, UpcomingItem{
+				Time:    p.Time,
+				AppID:   app.ID,
+				AppName: app.Name,
+				Action:  p.Action,
+			})
+		}
+	}
+
+	slices.SortFunc(items, func(a, b UpcomingItem) int {
+		if c := a.Time.Compare(b.Time); c != 0 {
+			return c
+		}
+
+		return strings.Compare(a.AppName, b.AppName)
+	})
+
+	return items, nil
 }
 
 func (s *Service) BrowseExe() (string, error) {

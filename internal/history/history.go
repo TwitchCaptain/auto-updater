@@ -71,10 +71,14 @@ func (l *Log) Tail(n int) ([]Event, error) {
 	events, err := l.readAll()
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return []Event{}, nil
 		}
 
 		return nil, err
+	}
+
+	if events == nil {
+		events = []Event{}
 	}
 
 	if n <= 0 || n >= len(events) {

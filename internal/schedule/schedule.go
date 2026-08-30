@@ -102,3 +102,28 @@ func Next(slot Slot, from time.Time) (time.Time, error) {
 
 	return time.Time{}, errors.New("no next run")
 }
+
+// Planned is the next fire of one slot.
+type Planned struct {
+	Time   time.Time
+	Action string
+}
+
+// NextEach returns the next fire after from for every valid slot, soonest first.
+func NextEach(slots []Slot, from time.Time) []Planned {
+	out := make([]Planned, 0, len(slots))
+	for _, slot := range slots {
+		t, err := Next(slot, from)
+		if err != nil {
+			continue
+		}
+
+		out = append(out, Planned{Time: t, Action: slot.Action})
+	}
+
+	slices.SortFunc(out, func(a, b Planned) int {
+		return a.Time.Compare(b.Time)
+	})
+
+	return out
+}

@@ -7,5 +7,6 @@ export {
 };
 
 export {
-    CheckResult
+    CheckResult,
+    UpcomingItem
 } from "./models.js";

@@ -92,8 +92,14 @@ func main() {
 		MinHeight:        480,
 		Hidden:           true,
 		EnableFileDrop:   true,
+		DevToolsEnabled:  true,
 		BackgroundColour: application.NewRGB(24, 26, 27),
 		URL:              "/",
+		KeyBindings: map[string]func(application.Window){
+			"F12": func(w application.Window) {
+				w.OpenDevTools()
+			},
+		},
 		Windows: application.WindowsWindow{
 			HiddenOnTaskbar: false,
 		},
@@ -125,6 +131,9 @@ func main() {
 		svc.Lock()
 	})
 	menu.AddSeparator()
+	menu.Add("Inspect").OnClick(func(_ *application.Context) {
+		win.OpenDevTools()
+	})
 	menu.Add("Quit").OnClick(func(_ *application.Context) {
 		svc.Stop()
 		app.Quit()

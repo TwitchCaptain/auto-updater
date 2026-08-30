@@ -111,8 +111,10 @@ export function ProtocolURL(id: string): $CancellablePromise<string> {
     return $Call.ByID(1791471375, id);
 }
 
-export function SaveApp(app: config$0.App): $CancellablePromise<void> {
-    return $Call.ByID(974972566, app);
+export function SaveApp(app: config$0.App): $CancellablePromise<config$0.App> {
+    return $Call.ByID(974972566, app).then(($result: any) => {
+        return $$createType0($result);
+    });
 }
 
 export function SaveConfig($in: config$0.Settings): $CancellablePromise<void> {
@@ -131,6 +133,12 @@ export function Unlock(password: string): $CancellablePromise<void> {
     return $Call.ByID(449477858, password);
 }
 
+export function Upcoming(): $CancellablePromise<$models.UpcomingItem[]> {
+    return $Call.ByID(3613454320).then(($result: any) => {
+        return $$createType12($result);
+    });
+}
+
 export function UpgradeNow(id: string): $CancellablePromise<$models.CheckResult | null> {
     return $Call.ByID(31310198, id).then(($result: any) => {
         return $$createType2($result);
@@ -139,7 +147,7 @@ export function UpgradeNow(id: string): $CancellablePromise<$models.CheckResult 
 
 export function WouldWrite(exePath: string, extra: string[]): $CancellablePromise<string[]> {
     return $Call.ByID(834107566, exePath, extra).then(($result: any) => {
-        return $$createType11($result);
+        return $$createType13($result);
     });
 }
 
@@ -155,4 +163,6 @@ const $$createType7 = preset$0.Info.createFrom;
 const $$createType8 = $Create.Array($$createType7);
 const $$createType9 = githubsrc$0.Release.createFrom;
 const $$createType10 = $Create.Nullable($$createType9);
-const $$createType11 = $Create.Array($Create.Any);
+const $$createType11 = $models.UpcomingItem.createFrom;
+const $$createType12 = $Create.Array($$createType11);
+const $$createType13 = $Create.Array($Create.Any);

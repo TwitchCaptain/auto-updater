@@ -13,7 +13,7 @@ import (
 	"github.com/TwitchCaptain/auto-updater/internal/config"
 )
 
-// Read current installed version: HTTP JSON, then PE FileVersion, then last-applied.
+// Read current installed version: HTTP JSON, then PE FileVersion, then exe -v/--version, then last-applied.
 func Read(ctx context.Context, app config.App, pe func(string) (string, error)) (string, error) {
 	if app.VersionHTTP != "" {
 		v, err := httpJSON(ctx, app)
@@ -24,6 +24,13 @@ func Read(ctx context.Context, app config.App, pe func(string) (string, error)) 
 
 	if pe != nil && app.ExePath != "" {
 		v, err := pe(app.ExePath)
+		if err == nil && v != "" {
+			return v, nil
+		}
+	}
+
+	if app.ExePath != "" {
+		v, err := fromCLI(ctx, app.ExePath)
 		if err == nil && v != "" {
 			return v, nil
 		}

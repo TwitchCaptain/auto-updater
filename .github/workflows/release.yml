@@ -75,7 +75,7 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts
           for arch in amd64 arm64; do
-            wails3 package GOOS=windows GOARCH="${arch}"
+            wails3 package GOOS=windows GOARCH="${arch}" EXTRA_TAGS=devtools
             mkdir -p "artifacts/windows_${arch}"
             cp "bin/captain-updater.exe" "artifacts/windows_${arch}/captain-updater.exe"
             bash init/windows/signexe.sh "artifacts/windows_${arch}/captain-updater.exe"

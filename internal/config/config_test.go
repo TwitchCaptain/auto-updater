@@ -36,6 +36,73 @@ func TestPlainRoundTrip(t *testing.T) {
 	}
 }
 
+func TestPatchAppSameIDTwice(t *testing.T) {
+	t.Parallel()
+
+	s := New(filepath.Join(t.TempDir(), "config.json"))
+	_ = s.Detect()
+
+	first, err := s.PatchApp(App{ID: "same", Name: "n", OwnerRepo: "o/r", ExePath: `c:\x.exe`})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := s.PatchApp(App{ID: first.ID, Name: "n2", OwnerRepo: "o/r", ExePath: `c:\x.exe`})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if first.ID != second.ID {
+		t.Fatalf("id changed %s -> %s", first.ID, second.ID)
+	}
+
+	if n := len(s.Settings().Apps); n != 1 {
+		t.Fatalf("apps %d", n)
+	}
+
+	if s.Settings().Apps[0].Name != "n2" {
+		t.Fatal(s.Settings().Apps[0])
+	}
+}
+
+func TestDeleteApp(t *testing.T) {
+	t.Parallel()
+
+	s := New(filepath.Join(t.TempDir(), "config.json"))
+	_ = s.Detect()
+
+	keep, err := s.PatchApp(App{Name: "keep", OwnerRepo: "o/k", ExePath: `c:\k.exe`})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gone, err := s.PatchApp(App{Name: "gone", OwnerRepo: "o/g", ExePath: `c:\g.exe`})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.DeleteApp(""); err == nil {
+		t.Fatal("empty id")
+	}
+
+	if err := s.DeleteApp("missing"); err == nil {
+		t.Fatal("unknown id")
+	}
+
+	if err := s.DeleteApp(gone.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	got := s.Settings().Apps
+	if len(got) != 1 || got[0].ID != keep.ID {
+		t.Fatal(got)
+	}
+
+	if err := s.DeleteApp(gone.ID); err == nil {
+		t.Fatal("already deleted")
+	}
+}
+
 func TestEncryptRefusesPlainWrite(t *testing.T) {
 	t.Parallel()
 

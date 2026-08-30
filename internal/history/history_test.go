@@ -53,3 +53,21 @@ func TestAppendTailRotate(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTailMissingFile(t *testing.T) {
+	t.Parallel()
+
+	log := New(filepath.Join(t.TempDir(), "missing.jsonl"))
+	got, err := log.Tail(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got == nil {
+		t.Fatal("expected empty slice, not nil")
+	}
+
+	if len(got) != 0 {
+		t.Fatalf("%+v", got)
+	}
+}

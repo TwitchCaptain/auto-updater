@@ -188,13 +188,13 @@ func (s *Store) Replace(in Settings) error {
 	return s.flush()
 }
 
-func (s *Store) PatchApp(app App) error {
+func (s *Store) PatchApp(app App) (App, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	found := false
 	for i, a := range s.set.Apps {
-		if a.ID == app.ID {
+		if a.ID != "" && a.ID == app.ID {
 			s.set.Apps[i] = app
 			found = true
 
@@ -211,8 +211,36 @@ func (s *Store) PatchApp(app App) error {
 	}
 
 	if err := validate(s.set); err != nil {
-		return err
+		return App{}, err
 	}
+
+	if err := s.flush(); err != nil {
+		return App{}, err
+	}
+
+	return app, nil
+}
+
+func (s *Store) DeleteApp(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if id == "" {
+		return errors.New("missing app id")
+	}
+
+	out := make([]App, 0, len(s.set.Apps))
+	for _, a := range s.set.Apps {
+		if a.ID != id {
+			out = append(out, a)
+		}
+	}
+
+	if len(out) == len(s.set.Apps) {
+		return fmt.Errorf("unknown app %s", id)
+	}
+
+	s.set.Apps = out
 
 	return s.flush()
 }

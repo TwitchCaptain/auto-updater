@@ -85,3 +85,27 @@ func TestNext(t *testing.T) {
 		t.Fatalf("expected next week, got %s", next)
 	}
 }
+
+func TestNextEach(t *testing.T) {
+	t.Parallel()
+
+	from := time.Date(2026, 8, 29, 9, 0, 0, 0, time.UTC) // Saturday
+	slots := []Slot{
+		{Days: []time.Weekday{time.Saturday}, Time: "18:00", Action: ActionNotify},
+		{Days: []time.Weekday{time.Saturday}, Time: "10:00", Action: ActionUpgrade},
+		{Days: []time.Weekday{}, Time: "11:00", Action: ActionNotify},
+	}
+
+	got := NextEach(slots, from)
+	if len(got) != 2 {
+		t.Fatalf("len %d: %+v", len(got), got)
+	}
+
+	if got[0].Action != ActionUpgrade || got[0].Time.Hour() != 10 {
+		t.Fatalf("want 10:00 upgrade first, got %+v", got[0])
+	}
+
+	if got[1].Action != ActionNotify || got[1].Time.Hour() != 18 {
+		t.Fatalf("want 18:00 notify second, got %+v", got[1])
+	}
+}

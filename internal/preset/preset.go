@@ -31,7 +31,7 @@ func All() []Info {
 			Name:       "unpackerr",
 			OwnerRepo:  "Unpackerr/unpackerr",
 			PrimaryExe: "unpackerr.exe",
-			Notes:      "GitHub zip names include the CPU architecture (amd64, arm64, …).",
+			Notes:      "GitHub zip names include the CPU architecture (amd64, arm64, …). Version comes from unpackerr -v (no PE FileVersion).",
 		},
 		{
 			ID:         "captain-updater",
