@@ -26,7 +26,7 @@ jobs:
           cache: true
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install nsis, task, and wails3
@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y nsis
-          go install github.com/go-task/task/v3/cmd/task@v3.45.4
+          go install github.com/go-task/task/v3/cmd/task@ff3372fc50a47348610d722616f1a073aace0513 # v3.53.1
           WAILS_VER="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
           go install "github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VER}"
       - name: Fail closed without codesign and GoReleaser Pro
@@ -53,11 +53,10 @@ jobs:
       - name: Install golift codesign
         env:
           GOBIN: ${{ runner.temp }}/codesign-bin
-          GOTOOLCHAIN: auto # codesign@v1.0.3 needs Go 1.27; the module is 1.25
         run: |
           set -euo pipefail
           mkdir -p "${GOBIN}"
-          go install golift.io/codesign/cmd/codesign@v1.0.3
+          go install golift.io/codesign/cmd/codesign@b7c5fb995ab63ba19b80ebf3e4d60b74b2efbc10 # v1.1.0
           echo "${GOBIN}" >> "${GITHUB_PATH}"
           echo "CODESIGN_BIN=${GOBIN}/codesign" >> "${GITHUB_ENV}"
       - name: Frontend and bindings
