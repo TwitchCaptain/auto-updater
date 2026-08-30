@@ -14,6 +14,7 @@ jobs:
       contents: write
       id-token: write
     env:
+      CGO_ENABLED: "0"
       CODESIGN_URL: ${{ secrets.CODESIGN_URL }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --prefix frontend
-          wails3 generate bindings -ts
+          GOOS=windows wails3 generate bindings -ts
           npm run build --prefix frontend
       - name: Package Windows amd64 and arm64
         env:

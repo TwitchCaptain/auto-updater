@@ -30,12 +30,12 @@ jobs:
             TAG="$(git ls-remote --tags https://github.com/wailsapp/wails.git 'v3*' | awk -F/ '{print $NF}' | grep -E '^v3\.' | sort -V | tail -1)"
           fi
           echo "Using ${TAG}"
-          go install "github.com/wailsapp/wails/v3/cmd/wails3@${TAG}"
+          CGO_ENABLED=0 go install "github.com/wailsapp/wails/v3/cmd/wails3@${TAG}"
           go get "github.com/wailsapp/wails/v3@${TAG}"
           go mod tidy
           wails3 update build-assets || wails3 generate build-assets || true
           npm ci --prefix frontend || npm install --prefix frontend
-          wails3 generate bindings -ts
+          CGO_ENABLED=0 GOOS=windows wails3 generate bindings -ts
       - name: Open PR if anything besides go.sum changed
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
