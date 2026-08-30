@@ -80,13 +80,17 @@ func startPath(ctx context.Context, path string) error {
 	return cmd.Start()
 }
 
-func elevateCopy(_ context.Context, _, _ string) error {
+func elevateCopyMany(_ context.Context, _ []FileCopy) error {
 	return errors.New("UAC copy is Windows-only")
 }
+
+func SetAppUserModelID() error { return nil }
 
 func SetStartup(_ bool, _ string) error {
 	return nil
 }
+
+func hasStartup() bool { return false }
 
 func findService(_ string) string { return "" }
 

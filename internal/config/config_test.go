@@ -3,9 +3,12 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/TwitchCaptain/auto-updater/internal/crypt"
+	"github.com/TwitchCaptain/auto-updater/internal/schedule"
 )
 
 func TestPlainRoundTrip(t *testing.T) {
@@ -33,6 +36,35 @@ func TestPlainRoundTrip(t *testing.T) {
 
 	if s2.Settings().GitHubToken != "tok" {
 		t.Fatal(s2.Settings())
+	}
+}
+
+func TestSanitizeOnSave(t *testing.T) {
+	t.Parallel()
+
+	s := New(filepath.Join(t.TempDir(), "config.json"))
+	_ = s.Detect()
+
+	got, err := s.PatchApp(App{
+		Name:      "x",
+		OwnerRepo: "https://github.com/foo/bar.git",
+		ExePath:   `file:///C:/Program%20Files/app.exe`,
+		Schedules: []schedule.Slot{{Days: []time.Weekday{1}, Time: "4:00:00", Action: schedule.ActionNotify}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.OwnerRepo != "foo/bar" {
+		t.Fatalf("repo %s", got.OwnerRepo)
+	}
+
+	if got.Schedules[0].Time != "04:00" {
+		t.Fatalf("time %s", got.Schedules[0].Time)
+	}
+
+	if got.ExePath == "" || strings.Contains(strings.ToLower(got.ExePath), "file:") {
+		t.Fatalf("exe %s", got.ExePath)
 	}
 }
 

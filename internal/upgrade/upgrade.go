@@ -47,11 +47,16 @@ func (e *Engine) Check(ctx context.Context, app config.App) (*Result, error) {
 	local, _ := locver.Read(ctx, app, peversion.FileVersion)
 	remote := strings.TrimPrefix(rel.TagName, "v")
 
+	token := ""
+	if e.GH != nil {
+		token = e.GH.Token
+	}
+
 	return &Result{
 		Local:      local,
 		Remote:     remote,
 		AssetName:  rel.Asset.Name,
-		AssetURL:   rel.Asset.URL,
+		AssetURL:   rel.Asset.DownloadURL(token),
 		AssetSize:  rel.Asset.Size,
 		Newer:      local == "" || githubsrc.Newer(rel.TagName, local),
 		HTMLURL:    rel.HTMLURL,
@@ -83,12 +88,14 @@ func (e *Engine) Upgrade(ctx context.Context, app config.App) (*Result, error) {
 	destDir := filepath.Dir(app.ExePath)
 	staging := filepath.Join(tmp, "out")
 	self := host.IsSelf(app.ExePath)
+	lowerAsset := strings.ToLower(res.AssetName)
 
-	if strings.HasSuffix(strings.ToLower(res.AssetName), ".zip") {
+	switch {
+	case strings.HasSuffix(lowerAsset, ".zip"):
 		if _, err := extract.FromZip(dl, staging, app.ExePath, app.ExtraFiles); err != nil {
 			return res, err
 		}
-	} else {
+	case strings.HasSuffix(lowerAsset, ".exe"):
 		if err := os.MkdirAll(staging, 0o755); err != nil {
 			return res, err
 		}
@@ -96,6 +103,8 @@ func (e *Engine) Upgrade(ctx context.Context, app config.App) (*Result, error) {
 		if err := copyFile(dl, filepath.Join(staging, filepath.Base(app.ExePath))); err != nil {
 			return res, err
 		}
+	default:
+		return res, fmt.Errorf("unsupported asset %s (need a .zip or .exe)", res.AssetName)
 	}
 
 	entries, err := os.ReadDir(staging)
@@ -104,7 +113,10 @@ func (e *Engine) Upgrade(ctx context.Context, app config.App) (*Result, error) {
 	}
 
 	svcName := ""
+	wasRunning := false
 	if !self {
+		n, _ := host.RunningCount(app.ExePath)
+		wasRunning = n > 0
 		svcName = host.FindService(app.ExePath)
 		_ = host.Stop(app.ExePath)
 		if svcName != "" {
@@ -114,8 +126,8 @@ func (e *Engine) Upgrade(ctx context.Context, app config.App) (*Result, error) {
 		_ = host.WaitStopped(app.ExePath, 15*time.Second)
 	}
 
-	var written []string
-	var selfNew string
+	var copies []host.FileCopy
+	var selfSrc string
 
 	for _, ent := range entries {
 		if ent.IsDir() {
@@ -125,44 +137,61 @@ func (e *Engine) Upgrade(ctx context.Context, app config.App) (*Result, error) {
 		src := filepath.Join(staging, ent.Name())
 		dest := filepath.Join(destDir, ent.Name())
 		if self && strings.EqualFold(ent.Name(), filepath.Base(app.ExePath)) {
-			selfNew = dest + ".new"
-			if err := copyFile(src, selfNew); err != nil {
-				return res, err
-			}
-
-			written = append(written, selfNew)
+			selfSrc = src
 
 			continue
 		}
 
-		if err := host.Place(ctx, src, dest); err != nil {
-			return res, fmt.Errorf("write %s: %w", dest, err)
-		}
-
-		written = append(written, dest)
+		copies = append(copies, host.FileCopy{Src: src, Dest: dest})
 	}
 
-	res.WouldWrite = written
-
 	if self {
-		if selfNew == "" {
+		if selfSrc == "" {
 			return res, fmt.Errorf("archive did not contain %s", filepath.Base(app.ExePath))
+		}
+
+		if len(copies) > 0 {
+			if err := host.PlaceMany(ctx, copies); err != nil {
+				return res, err
+			}
+		}
+
+		// Must live outside tmp: Upgrade's defer RemoveAll would delete a staged .new.
+		selfNew, err := persistSelfImage(selfSrc, filepath.Base(app.ExePath))
+		if err != nil {
+			return res, err
 		}
 
 		if err := host.ScheduleReplace(selfNew, app.ExePath); err != nil {
 			return res, err
 		}
 
+		res.WouldWrite = []string{app.ExePath}
 		res.Restart = true
 
 		return res, nil
 	}
+
+	if err := host.PlaceMany(ctx, copies); err != nil {
+		return res, err
+	}
+
+	written := make([]string, 0, len(copies))
+	for _, c := range copies {
+		written = append(written, c.Dest)
+	}
+
+	res.WouldWrite = written
 
 	if svcName != "" {
 		if err := host.StartService(svcName); err != nil {
 			return res, fmt.Errorf("files copied; service start failed: %w", err)
 		}
 
+		return res, nil
+	}
+
+	if !wasRunning {
 		return res, nil
 	}
 
@@ -204,6 +233,15 @@ func (e *Engine) download(ctx context.Context, url, dest string) error {
 	_, err = io.Copy(f, resp.Body)
 
 	return err
+}
+
+func persistSelfImage(src, base string) (string, error) {
+	dest := filepath.Join(os.TempDir(), "cu-self-"+sanitize(base))
+	if err := copyFile(src, dest); err != nil {
+		return "", err
+	}
+
+	return dest, nil
 }
 
 func copyFile(src, dest string) error {

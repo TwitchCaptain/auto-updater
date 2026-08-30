@@ -185,6 +185,54 @@
       await refresh();
       const found = settings.apps.find((a) => a.id === saved.id);
       selected = found ? cloneApp(found) : selected;
+      extraText = (selected.extraFiles || []).join('\n');
+      return saved;
+    } catch (e) {
+      fail(e);
+      return null;
+    } finally {
+      busy = '';
+    }
+  }
+
+  async function checkNow() {
+    if (!selected) return;
+    const saved = await saveApp();
+    if (!saved?.id) return;
+    busy = 'Checking…';
+    try {
+      const r = await Service.CheckNow(saved.id);
+      if (!r) {
+        return;
+      }
+      localVer = r.local;
+      preview = {
+        tag_name: r.remote,
+        html_url: r.htmlUrl,
+        asset: { name: r.assetName, browser_download_url: r.assetURL, size: r.assetSize },
+      };
+      wouldWrite = r.wouldWrite || wouldWrite;
+      await refresh();
+    } catch (e) {
+      fail(e);
+    } finally {
+      busy = '';
+    }
+  }
+
+  async function upgradeNow() {
+    if (!selected) return;
+    const saved = await saveApp();
+    if (!saved?.id) return;
+    busy = 'Upgrading…';
+    err = '';
+    try {
+      const r = await Service.UpgradeNow(saved.id);
+      if (r?.restart) {
+        busy = 'Restarting Captain Updater to finish the update…';
+      }
+      await refresh();
+      await doPreview();
     } catch (e) {
       fail(e);
     } finally {
@@ -247,53 +295,16 @@
     }
   }
 
-  async function checkNow() {
-    if (!selected?.id) return;
-    busy = 'Checking…';
-    try {
-      const r = await Service.CheckNow(selected.id);
-      if (!r) {
-        return;
-      }
-      localVer = r.local;
-      preview = {
-        tag_name: r.remote,
-        html_url: r.htmlUrl,
-        asset: { name: r.assetName, browser_download_url: r.assetURL, size: r.assetSize },
-      };
-      wouldWrite = r.wouldWrite || wouldWrite;
-      await refresh();
-    } catch (e) {
-      fail(e);
-    } finally {
-      busy = '';
-    }
-  }
-
-  async function upgradeNow() {
-    if (!selected?.id) return;
-    busy = 'Upgrading…';
-    err = '';
-    try {
-      const r = await Service.UpgradeNow(selected.id);
-      if (r?.restart) {
-        busy = 'Restarting Captain Updater to finish the update…';
-      }
-      await refresh();
-      await doPreview();
-    } catch (e) {
-      fail(e);
-    } finally {
-      busy = '';
-    }
-  }
-
   async function browseExe() {
     const p = await Service.BrowseExe();
-    if (p && selected) {
-      selected.exePath = p;
-      await refreshWouldWrite();
+    if (!p || !selected) return;
+    if (p.toLowerCase().endsWith('.lnk')) {
+      selected.shortcutPath = p;
+      await loadLnk();
+      return;
     }
+    selected.exePath = p;
+    await refreshWouldWrite();
   }
 
   async function browseLnk() {
@@ -311,6 +322,13 @@
     }
     try {
       shortcut = await Service.ParseShortcut(selected.shortcutPath);
+      if (
+        shortcut?.target &&
+        (!selected.exePath || selected.exePath.toLowerCase().endsWith('.lnk'))
+      ) {
+        selected.exePath = shortcut.target;
+        await refreshWouldWrite();
+      }
     } catch {
       shortcut = null;
     }
@@ -395,6 +413,13 @@
     const onRej = (e: PromiseRejectionEvent) => fail(e.reason);
     window.addEventListener('error', onErr);
     window.addEventListener('unhandledrejection', onRej);
+    Events.On('config-locked', () => {
+      locked = true;
+      selected = null;
+      settings = { startWithWindows: false, apps: [] };
+      password = '';
+      preview = null;
+    });
     Events.On('open-app', (v: { data?: string }) => {
       const id = v?.data;
       if (!id) return;
@@ -410,6 +435,12 @@
       const files = v?.data || [];
       const exe = files.find((f) => f.toLowerCase().endsWith('.exe'));
       const lnk = files.find((f) => f.toLowerCase().endsWith('.lnk'));
+      if ((exe || lnk) && !selected) {
+        selected = emptyApp();
+        extraText = '';
+        preview = null;
+        wouldWrite = [];
+      }
       if (exe && selected) selected.exePath = exe;
       if (lnk && selected) {
         selected.shortcutPath = lnk;
@@ -417,7 +448,18 @@
       }
       void refreshWouldWrite();
     });
-    void refresh();
+    void (async () => {
+      await refresh();
+      try {
+        const id = await Service.ConsumePendingOpen();
+        if (!id) return;
+        page = 'apps';
+        const a = settings.apps.find((x) => x.id === id);
+        if (a) pick(a, true);
+      } catch {
+        /* bindings may lag a rebuild; open-app event still works */
+      }
+    })();
     return () => {
       window.removeEventListener('error', onErr);
       window.removeEventListener('unhandledrejection', onRej);
@@ -686,14 +728,14 @@
 
                 <div class="mt-3 d-flex gap-2 flex-wrap">
                   <button type="button" class="btn btn-primary" disabled={!!busy} onclick={() => saveApp()}>Save</button>
-                  <button type="button" class="btn btn-info" disabled={!selected.id || !!busy} onclick={() => checkNow()}
+                  <button type="button" class="btn btn-info" disabled={!selected.name || !!busy} onclick={() => checkNow()}
                     >Check now</button
                   >
                   <button
                     id="upgrade-btn"
                     type="button"
                     class={['btn', 'btn-warning', { 'shadow-lg': highlightUpgrade }]}
-                    disabled={!selected.id || !!busy}
+                    disabled={!selected.name || !!busy}
                     onclick={() => upgradeNow()}>Upgrade</button
                   >
                   <button

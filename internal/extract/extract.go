@@ -41,7 +41,7 @@ func FromZip(zpath, destDir, destExe string, extra []string) ([]string, error) {
 			continue
 		}
 
-		outPath := filepath.Join(destDir, base)
+		outPath := filepath.Join(destDir, outputBase(base, destExe))
 		if err := copyZipFile(f, outPath); err != nil {
 			return written, err
 		}
@@ -142,6 +142,17 @@ func selectMembers(zpath, destExe string, extra []string) (map[string]bool, erro
 	}
 
 	return want, nil
+}
+
+// outputBase keeps the user's primary exe name (and casing) when the zip
+// member is that exe under a different case, which Windows treats as the same file.
+func outputBase(zipBase, destExe string) string {
+	destBase := fileBase(destExe)
+	if destBase != "" && destBase != "." && nameMatch(destExe, zipBase) {
+		return destBase
+	}
+
+	return zipBase
 }
 
 func nameMatch(pattern, name string) bool {

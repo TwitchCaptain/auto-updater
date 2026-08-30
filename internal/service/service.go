@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -19,23 +20,45 @@ import (
 	"github.com/TwitchCaptain/auto-updater/internal/history"
 	"github.com/TwitchCaptain/auto-updater/internal/host"
 	"github.com/TwitchCaptain/auto-updater/internal/locver"
+	"github.com/TwitchCaptain/auto-updater/internal/paths"
 	"github.com/TwitchCaptain/auto-updater/internal/peversion"
 	"github.com/TwitchCaptain/auto-updater/internal/preset"
+	"github.com/TwitchCaptain/auto-updater/internal/protocol"
 	"github.com/TwitchCaptain/auto-updater/internal/schedule"
 	"github.com/TwitchCaptain/auto-updater/internal/scheduler"
 	"github.com/TwitchCaptain/auto-updater/internal/toast"
 	"github.com/TwitchCaptain/auto-updater/internal/upgrade"
 )
 
-const protocol = "captainupdater"
-
 type Service struct {
-	app   *application.App
-	win   application.Window
-	store *config.Store
-	hist  *history.Log
-	eng   *upgrade.Engine
-	sched *scheduler.Runner
+	app     *application.App
+	win     application.Window
+	store   *config.Store
+	hist    *history.Log
+	eng     *upgrade.Engine
+	sched   *scheduler.Runner
+	pending muString
+}
+
+type muString struct {
+	mu sync.Mutex
+	s  string
+}
+
+func (m *muString) set(s string) {
+	m.mu.Lock()
+	m.s = s
+	m.mu.Unlock()
+}
+
+func (m *muString) take() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	s := m.s
+	m.s = ""
+
+	return s
 }
 
 func New(store *config.Store, hist *history.Log) *Service {
@@ -85,6 +108,9 @@ func (s *Service) Unlock(password string) error {
 func (s *Service) Lock() {
 	s.store.Lock()
 	s.hide()
+	if s.app != nil {
+		s.app.Event.Emit("config-locked", "")
+	}
 }
 
 func (s *Service) EnableEncryption(password string) error {
@@ -100,7 +126,12 @@ func (s *Service) GetConfig() (config.Settings, error) {
 		return config.Settings{}, err
 	}
 
-	return s.store.Settings(), nil
+	set := s.store.Settings()
+	// Installer "Start with Windows" writes a Startup .lnk without touching config.json.
+	// Reflect the real shortcut so Save settings does not delete it.
+	set.StartWithWindows = host.HasStartup()
+
+	return set, nil
 }
 
 func (s *Service) SaveConfig(in config.Settings) error {
@@ -123,6 +154,8 @@ func (s *Service) SaveApp(app config.App) (config.App, error) {
 	if err := s.requireOpen(); err != nil {
 		return config.App{}, err
 	}
+
+	app = resolveAppPaths(app)
 
 	return s.store.PatchApp(app)
 }
@@ -222,7 +255,7 @@ func (s *Service) UpgradeNow(id string) (*CheckResult, error) {
 		return nil, err
 	}
 
-	_ = s.store.SetLastVersion(app.ID, res.Remote)
+	_ = s.store.SetLastVersion(app.ID, githubsrc.Display(res.Remote))
 	_ = s.hist.Append(history.Event{
 		AppID: app.ID, AppName: app.Name, Action: history.ActionUpgrade,
 		From: res.Local, To: res.Remote, Asset: res.AssetName, Result: "ok",
@@ -296,7 +329,7 @@ func (s *Service) BrowseExe() (string, error) {
 
 	dlg := s.app.Dialog.OpenFile().SetTitle("Select executable")
 	if runtime.GOOS == "windows" {
-		dlg = dlg.AddFilter("Programs", "*.exe")
+		dlg = dlg.AddFilter("Programs", "*.exe;*.lnk")
 	}
 
 	return dlg.AddFilter("All files", "*.*").PromptForSingleSelection()
@@ -315,7 +348,14 @@ func (s *Service) BrowseShortcut() (string, error) {
 }
 
 func (s *Service) ParseShortcut(path string) (host.Shortcut, error) {
-	return host.ParseShortcut(path)
+	return host.ParseShortcut(paths.CleanUserPath(path))
+}
+
+// ConsumePendingOpen returns (and clears) an app id from a protocol launch
+// (toast click or second instance). The frontend calls this after it is mounted
+// because the first-launch event is emitted before WebView2 is ready.
+func (s *Service) ConsumePendingOpen() string {
+	return s.pending.take()
 }
 
 func (s *Service) ShowWindow() {
@@ -331,12 +371,16 @@ func (s *Service) HostArch() string {
 }
 
 func (s *Service) ProtocolURL(id string) string {
-	return protocol + "://app/" + id
+	return "captainupdater://app/" + id
 }
 
 //wails:ignore
 func (s *Service) HandleProtocol(raw string) {
-	id := parseAppID(raw)
+	id := protocol.ParseAppID(raw)
+	if id != "" {
+		s.pending.set(id)
+	}
+
 	s.show(id)
 }
 
@@ -366,7 +410,7 @@ func (s *Service) onSlot(app config.App, slot schedule.Slot) {
 		_ = toast.Show(toast.Note{
 			Title:   "Update available",
 			Message: app.Name + " " + res.Remote,
-			URL:     protocol + "://app/" + app.ID,
+			URL:     "captainupdater://app/" + app.ID,
 		})
 	default:
 		_, _ = s.UpgradeNow(app.ID)
@@ -382,6 +426,10 @@ func (s *Service) requireOpen() error {
 }
 
 func (s *Service) show(appID string) {
+	if appID != "" {
+		s.pending.set(appID)
+	}
+
 	if s.win != nil {
 		s.win.Show()
 		s.win.Focus()
@@ -414,13 +462,29 @@ func (s *Service) CheckAll() {
 	}
 }
 
-func parseAppID(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if i := strings.Index(strings.ToLower(raw), "://app/"); i >= 0 {
-		return strings.Trim(raw[i+7:], "/")
+func resolveAppPaths(app config.App) config.App {
+	app.ExePath = paths.CleanUserPath(app.ExePath)
+	app.ShortcutPath = paths.CleanUserPath(app.ShortcutPath)
+
+	if paths.IsShortcut(app.ExePath) {
+		sc, err := host.ParseShortcut(app.ExePath)
+		if err == nil && sc.Target != "" {
+			if app.ShortcutPath == "" {
+				app.ShortcutPath = app.ExePath
+			}
+
+			app.ExePath = paths.CleanUserPath(sc.Target)
+		}
 	}
 
-	return ""
+	if app.ExePath == "" && paths.IsShortcut(app.ShortcutPath) {
+		sc, err := host.ParseShortcut(app.ShortcutPath)
+		if err == nil && sc.Target != "" {
+			app.ExePath = paths.CleanUserPath(sc.Target)
+		}
+	}
+
+	return app
 }
 
 func resField(res *upgrade.Result, local bool) string {

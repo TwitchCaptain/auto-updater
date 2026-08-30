@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/TwitchCaptain/auto-updater/internal/config"
+	"github.com/TwitchCaptain/auto-updater/internal/githubsrc"
 )
 
 // Read current installed version: HTTP JSON, then PE ProductVersion, then exe -v/--version, then last-applied.
@@ -18,26 +19,26 @@ func Read(ctx context.Context, app config.App, pe func(string) (string, error)) 
 	if app.VersionHTTP != "" {
 		v, err := httpJSON(ctx, app)
 		if err == nil && v != "" {
-			return v, nil
+			return githubsrc.Display(v), nil
 		}
 	}
 
 	if pe != nil && app.ExePath != "" {
 		v, err := pe(app.ExePath)
 		if err == nil && v != "" {
-			return v, nil
+			return githubsrc.Display(v), nil
 		}
 	}
 
 	if app.ExePath != "" {
 		v, err := fromCLI(ctx, app.ExePath)
 		if err == nil && v != "" {
-			return v, nil
+			return githubsrc.Display(v), nil
 		}
 	}
 
 	if app.LastVersion != "" {
-		return app.LastVersion, nil
+		return githubsrc.Display(app.LastVersion), nil
 	}
 
 	return "", errors.New("could not determine installed version")

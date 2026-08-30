@@ -12,6 +12,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/TwitchCaptain/auto-updater/internal/crypt"
+	"github.com/TwitchCaptain/auto-updater/internal/githubsrc"
+	"github.com/TwitchCaptain/auto-updater/internal/paths"
 	"github.com/TwitchCaptain/auto-updater/internal/schedule"
 )
 
@@ -174,6 +176,7 @@ func (s *Store) Replace(in Settings) error {
 	}
 
 	for i := range in.Apps {
+		sanitizeApp(&in.Apps[i])
 		if in.Apps[i].ID == "" {
 			in.Apps[i].ID = uuid.NewString()
 		}
@@ -191,6 +194,8 @@ func (s *Store) Replace(in Settings) error {
 func (s *Store) PatchApp(app App) (App, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	sanitizeApp(&app)
 
 	found := false
 	for i, a := range s.set.Apps {
@@ -355,4 +360,18 @@ func clone(s Settings) Settings {
 	s.Apps = apps
 
 	return s
+}
+
+func sanitizeApp(app *App) {
+	app.ExePath = paths.CleanUserPath(app.ExePath)
+	app.ShortcutPath = paths.CleanUserPath(app.ShortcutPath)
+	app.OwnerRepo = githubsrc.NormalizeRepo(app.OwnerRepo)
+
+	for i := range app.Schedules {
+		app.Schedules[i].Time = schedule.CanonicalTime(app.Schedules[i].Time)
+	}
+
+	if app.Source == "" {
+		app.Source = SourceGitHub
+	}
 }

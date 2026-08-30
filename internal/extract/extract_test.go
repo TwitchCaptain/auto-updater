@@ -68,6 +68,30 @@ func TestFromZipGlob(t *testing.T) {
 	}
 }
 
+func TestFromZipUsesDestExeCasing(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	zpath := filepath.Join(dir, "rel.zip")
+	if err := writeZip(zpath, map[string]string{"APP.EXE": "body"}); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := filepath.Join(dir, "out")
+	got, err := FromZip(zpath, dest, filepath.Join(dest, "app.exe"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 1 || filepath.Base(got[0]) != "app.exe" {
+		t.Fatalf("wrote %v", got)
+	}
+
+	if _, err := os.Stat(filepath.Join(dest, "app.exe")); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestWouldWrite(t *testing.T) {
 	t.Parallel()
 

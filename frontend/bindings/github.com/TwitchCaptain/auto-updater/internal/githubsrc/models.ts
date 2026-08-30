@@ -11,6 +11,7 @@ import { Create as $Create } from "@wailsio/runtime";
 export class Asset {
     "name": string;
     "browser_download_url": string;
+    "url": string;
     "size": number;
 
     /** Creates a new Asset instance. */
@@ -20,6 +21,9 @@ export class Asset {
         }
         if (!("browser_download_url" in $$source)) {
             this["browser_download_url"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
         }
         if (!("size" in $$source)) {
             this["size"] = 0;

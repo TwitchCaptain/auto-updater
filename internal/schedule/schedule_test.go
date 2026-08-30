@@ -86,6 +86,28 @@ func TestNext(t *testing.T) {
 	}
 }
 
+func TestCanonicalTime(t *testing.T) {
+	t.Parallel()
+
+	if CanonicalTime("4:00") != "04:00" {
+		t.Fatal(CanonicalTime("4:00"))
+	}
+
+	if CanonicalTime("04:00:00") != "04:00" {
+		t.Fatal(CanonicalTime("04:00:00"))
+	}
+
+	slot := Slot{Days: []time.Weekday{time.Monday}, Time: "03:15:00", Action: ActionUpgrade}
+	if err := Validate([]Slot{slot}); err != nil {
+		t.Fatal(err)
+	}
+
+	mon := time.Date(2026, 8, 31, 3, 15, 0, 0, time.UTC)
+	if !Due(slot, mon) {
+		t.Fatal("seconds from <input type=time> must still match the minute")
+	}
+}
+
 func TestNextEach(t *testing.T) {
 	t.Parallel()
 

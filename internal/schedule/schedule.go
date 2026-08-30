@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -22,16 +23,32 @@ type Slot struct {
 }
 
 func (s Slot) hourMinute() (int, int, error) {
-	var h, m int
-	if _, err := fmt.Sscanf(s.Time, "%d:%d", &h, &m); err != nil {
-		return 0, 0, fmt.Errorf("time %q: %w", s.Time, err)
+	return parseHM(s.Time)
+}
+
+func parseHM(raw string) (int, int, error) {
+	raw = strings.TrimSpace(raw)
+	var h, m, sec int
+	n, err := fmt.Sscanf(raw, "%d:%d:%d", &h, &m, &sec)
+	if n < 2 {
+		return 0, 0, fmt.Errorf("time %q: %w", raw, err)
 	}
 
 	if h < 0 || h > 23 || m < 0 || m > 59 {
-		return 0, 0, fmt.Errorf("time %q out of range", s.Time)
+		return 0, 0, fmt.Errorf("time %q out of range", raw)
 	}
 
 	return h, m, nil
+}
+
+// CanonicalTime normalizes a UI time value to HH:MM (WebView2 may send HH:MM:SS).
+func CanonicalTime(raw string) string {
+	h, m, err := parseHM(raw)
+	if err != nil {
+		return raw
+	}
+
+	return fmt.Sprintf("%02d:%02d", h, m)
 }
 
 func (s Slot) hasDay(d time.Weekday) bool {

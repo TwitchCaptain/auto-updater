@@ -106,6 +106,63 @@ func TestNewer(t *testing.T) {
 	if !Newer("v1.0.0", "") {
 		t.Fatal("empty local is older than a release")
 	}
+
+	// Windows PE FileVersion / ProductVersion often has a fourth number.
+	if Newer("v0.1.2", "0.1.2.1056") {
+		t.Fatal("fourth PE number is a revision, not a newer release")
+	}
+
+	if Newer("0.1.2.0", "v0.1.2") {
+		t.Fatal("padded Windows product version")
+	}
+
+	if !Newer("v0.1.3", "0.1.2.9") {
+		t.Fatal("real bump still newer")
+	}
+
+	if Display("0.1.2.9") != "0.1.2" {
+		t.Fatalf("display %s", Display("0.1.2.9"))
+	}
+}
+
+func TestMatchSkipsInstallerWhenZipExists(t *testing.T) {
+	t.Parallel()
+
+	assets := []Asset{
+		{Name: "captain-updater.amd64.installer.exe"},
+		{Name: "captain-updater.amd64.exe.zip", URL: "https://example/zip"},
+	}
+
+	got, err := Match(assets, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Name != "captain-updater.amd64.exe.zip" {
+		t.Fatalf("got %s", got.Name)
+	}
+}
+
+func TestMatchIgnoresSevenZ(t *testing.T) {
+	t.Parallel()
+
+	_, err := Match([]Asset{{Name: "app_windows_amd64.7z"}}, "amd64")
+	if err == nil {
+		t.Fatal("expected no match for 7z-only")
+	}
+}
+
+func TestDownloadURL(t *testing.T) {
+	t.Parallel()
+
+	a := Asset{URL: "https://github.com/file.zip", APIURL: "https://api.github.com/repos/o/r/releases/assets/1"}
+	if a.DownloadURL("") != a.URL {
+		t.Fatal("public download")
+	}
+
+	if a.DownloadURL("tok") != a.APIURL {
+		t.Fatal("private download uses API url")
+	}
 }
 
 func TestMatchCaptainUpdater(t *testing.T) {
