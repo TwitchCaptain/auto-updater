@@ -82,6 +82,8 @@ jobs:
             cp "bin/captain-updater-${arch}-installer.exe" "artifacts/captain-updater.${arch}.installer.exe"
             bash init/windows/signexe.sh "artifacts/captain-updater.${arch}.installer.exe"
           done
+      - name: Restore files wails package rewrites
+        run: git restore --source=HEAD --worktree -- .
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser-pro
