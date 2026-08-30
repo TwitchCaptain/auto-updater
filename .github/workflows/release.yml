@@ -53,6 +53,7 @@ jobs:
       - name: Install golift codesign
         env:
           GOBIN: ${{ runner.temp }}/codesign-bin
+          GOTOOLCHAIN: auto # codesign@v1.0.3 needs Go 1.27; the module is 1.25
         run: |
           set -euo pipefail
           mkdir -p "${GOBIN}"
