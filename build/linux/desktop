@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Captain Updater
+Comment=Keep Windows apps current from GitHub releases
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/auto-updater %u
+Terminal=false
+Type=Application
+Icon=auto-updater
+Categories=Utility;
+StartupWMClass=auto-updater
+
+ 

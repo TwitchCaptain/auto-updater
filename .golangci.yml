@@ -1,0 +1,76 @@
+version: "2"
+linters:
+  default: all
+  disable:
+    - depguard
+    - exhaustruct
+    - exhaustruct_v5
+    - exhaustive
+    - dupl
+    - nlreturn
+    - tagliatelle
+    - cyclop
+    - testpackage
+    - wsl
+    - wsl_v5
+    - embeddedstructfieldcheck
+    - funcorder
+    - noinlineerr
+    - goconst
+    - gomodguard
+    - nonamedreturns
+    - forbidigo
+    - varnamelen
+    - ireturn
+    - mnd
+    - wrapcheck
+    - err113
+    - godox
+    - paralleltest
+    - tparallel
+    - funlen
+    - gocognit
+    - nestif
+    - maintidx
+    - lll
+    - gochecknoglobals
+    - gochecknoinits
+    - noctx
+  settings:
+    gosec:
+      excludes:
+        - G304 # user-chosen exe paths
+        - G107 # user-configured version URL
+        - G204 # Windows process start / UAC
+        - G301 # dest dirs next to user exes
+        - G302 # extracted exes must be executable
+        - G306 # extracted exes must be executable
+        - G110 # zip size is bounded by the GitHub asset
+        - G703 # dest is the user-chosen install directory
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - std-error-handling
+    paths:
+      - build/
+    rules:
+      - linters:
+          - errcheck
+        path: .+_test.go
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/TwitchCaptain/auto-updater)
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

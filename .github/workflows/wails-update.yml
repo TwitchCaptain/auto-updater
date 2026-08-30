@@ -1,0 +1,66 @@
+name: wails-v3-update
+on:
+  schedule:
+    - cron: "17 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Latest Wails v3 and sync assets
+        run: |
+          set -euo pipefail
+          TAG="$(go list -m -versions github.com/wailsapp/wails/v3 | awk '{print $NF}')"
+          if [ -z "${TAG}" ]; then
+            TAG="$(git ls-remote --tags https://github.com/wailsapp/wails.git 'v3*' | awk -F/ '{print $NF}' | grep -E '^v3\.' | sort -V | tail -1)"
+          fi
+          echo "Using ${TAG}"
+          go install "github.com/wailsapp/wails/v3/cmd/wails3@${TAG}"
+          go get "github.com/wailsapp/wails/v3@${TAG}"
+          go mod tidy
+          wails3 update build-assets || wails3 generate build-assets || true
+          npm ci --prefix frontend || npm install --prefix frontend
+          wails3 generate bindings -ts
+      - name: Open PR if anything besides go.sum changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          if git diff --cached --name-only | grep -v '^go.sum$' | grep -q .; then
+            :
+          else
+            echo "Only go.sum; skip PR"
+            git reset HEAD
+            exit 0
+          fi
+          BRANCH="chore/wails-v3-$(date -u +%Y%m%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git commit -m "$(cat <<'EOF'
+          Keep Wails v3 CLI, Taskfiles, and bindings current.
+
+          EOF
+          )"
+          git push -u origin HEAD
+          gh pr create --title "Keep Wails v3 current" --body "Weekly sync of the Wails v3 module, CLI build assets, and generated bindings."

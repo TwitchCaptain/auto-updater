@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
+version: 2
+pro: true
+project_name: captain-updater
+
+builds:
+  - id: windows
+    builder: prebuilt
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    goamd64:
+      - v1
+    binary: captain-updater
+    prebuilt:
+      path: artifacts/windows_{{ .Arch }}/captain-updater.exe
+
+archives:
+  - id: exe-zip
+    ids:
+      - windows
+    formats: ["zip"]
+    name_template: "captain-updater.{{ .Arch }}.exe"
+    wrap_in_directory: false
+    files:
+      - src: LICENSE
+        dst: LICENSE.txt
+      - src: README.md
+        dst: README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  extra_files:
+    - glob: artifacts/captain-updater.*.installer.exe
