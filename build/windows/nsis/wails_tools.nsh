@@ -14,7 +14,10 @@
     !define INFO_PRODUCTNAME "Captain Updater"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "0.1.1"
+    !define INFO_PRODUCTVERSION "0.1.2"
+!endif
+!ifndef INFO_FILEVERSION
+    !define INFO_FILEVERSION "${INFO_PRODUCTVERSION}.0"
 !endif
 !ifndef INFO_COPYRIGHT
     !define INFO_COPYRIGHT "Copyright TwitchCaptain"

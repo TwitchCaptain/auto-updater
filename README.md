@@ -22,7 +22,7 @@ Each row is one GitHub repo, one downloaded asset, and up to five weekly schedul
 3. List **extra files** to copy from the same zip (filenames or globs). autobrr is one app: primary `autobrr.exe`, extra `autobrrctl.exe`.
 4. Save, then **Check now** / **Upgrade**, or schedule them.
 
-Version is taken from an optional HTTP JSON field, then the PE FileVersion of the primary exe, then `exe -v` / `--version` (unpackerr prints it that way; the Windows exe has no FileVersion resource), then the last version Captain Updater applied. autobrr uses the HTTP API (`/api/config` → `version`); `autobrr.exe` has no `-v` flag (`autobrrctl version` does).
+Version is taken from an optional HTTP JSON field, then the PE ProductVersion of the primary exe (FileVersion's fourth number is a git revision, not the GitHub tag), then `exe -v` / `--version`, then the last version Captain Updater applied. autobrr uses the HTTP API (`/api/config` → `version`); `autobrr.exe` has no `-v` flag (`autobrrctl version` does).
 
 **Notify** shows a sticky toast. Click it to focus this window on that app’s Upgrade button (`captainupdater://app/<id>`).
 
@@ -46,4 +46,4 @@ go test ./...
 
 Packaged Windows builds include WebView2 DevTools (tray **Inspect**, or **F12**). Runtime errors also show as a red banner in the window.
 
-Release tags `v*` run `wails3 package` for amd64 and arm64, Authenticode-sign the exe and installer, then publish with GoReleaser Pro.
+Release tags `v*` run `wails3 package` for amd64 and arm64, Authenticode-sign the exe and installer, then publish with GoReleaser Pro. The exe File version is `Major.Minor.Patch.REVISION` (`git rev-list --count --all`); Product version is the tag without `v`.

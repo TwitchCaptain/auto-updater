@@ -2,7 +2,8 @@ package peversion
 
 import "debug/pe"
 
-// FileVersion reads ProductVersion / FileVersion from a Windows PE if present.
+// FileVersion reads ProductVersion (then FileVersion x.y.z) from a Windows PE.
+// The PE FileVersion fourth number is a build/revision, not the GitHub tag.
 // Works on any OS because it parses the binary.
 func FileVersion(path string) (string, error) {
 	f, err := pe.Open(path)

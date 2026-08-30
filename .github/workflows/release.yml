@@ -74,14 +74,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
+          # generate:syso stamps FileVersion; create:nsis:installer signs the
+          # exe before NSIS embeds it. Sign the installer wrapper after.
           for arch in amd64 arm64; do
             wails3 package GOOS=windows GOARCH="${arch}" EXTRA_TAGS=devtools
             mkdir -p "artifacts/windows_${arch}"
             cp "bin/captain-updater.exe" "artifacts/windows_${arch}/captain-updater.exe"
-            bash init/windows/signexe.sh "artifacts/windows_${arch}/captain-updater.exe"
             cp "bin/captain-updater-${arch}-installer.exe" "artifacts/captain-updater.${arch}.installer.exe"
             bash init/windows/signexe.sh "artifacts/captain-updater.${arch}.installer.exe"
           done
+          python3 init/windows/require-authenticode.py \
+            artifacts/windows_amd64/captain-updater.exe \
+            artifacts/windows_arm64/captain-updater.exe \
+            artifacts/captain-updater.amd64.installer.exe \
+            artifacts/captain-updater.arm64.installer.exe
       - name: Restore files wails package rewrites
         run: git restore --source=HEAD --worktree -- .
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3

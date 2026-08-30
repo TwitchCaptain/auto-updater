@@ -110,7 +110,9 @@ tasks:
     summary: Generates Windows `.syso` file
     dir: build
     cmds:
-      - wails3 generate syso -arch {{.ARCH}} -icon windows/icon.ico -manifest windows/wails.exe.manifest -info windows/info.json -out ../wails_windows_{{.ARCH}}.syso
+      # FileVersion Major.Minor.Patch.REVISION; ProductVersion is the tag.
+      - bash ../init/windows/stamp-version.sh
+      - wails3 generate syso -arch {{.ARCH}} -icon windows/icon.ico -manifest windows/wails.exe.manifest.stamped -info windows/info.stamped.json -out ../wails_windows_{{.ARCH}}.syso
     vars:
       ARCH: '{{.ARCH | default ARCH}}'
 
@@ -125,6 +127,9 @@ tasks:
     cmds:
       # Create the Microsoft WebView2 bootstrapper if it doesn't exist
       - wails3 generate webview2bootstrapper -dir "{{.ROOT_DIR}}/build/windows/nsis"
+      # Sign the payload before NSIS packs it. Signing only the installer
+      # leaves the installed exe unsigned (Smart App Control / publisher).
+      - bash "{{.ROOT_DIR}}/init/windows/signexe.sh" "{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe"
       - |
         {{if eq OS "windows"}}
         makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}-DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}\{{.BIN_DIR}}\{{.APP_NAME}}.exe" project.nsi

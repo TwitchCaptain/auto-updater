@@ -8,6 +8,9 @@ frontend/dist/*
 frontend/node_modules
 build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+build/windows/info.stamped.json
+build/windows/wails.exe.manifest.stamped
+build/windows/nsis/version.generated.nsh
 # Mobile generated (per-machine; overlays hold absolute paths)
 build/ios/xcode/overlay.json
 build/ios/xcode/gen/
