@@ -37,3 +37,33 @@ func TestCopyFile(t *testing.T) {
 		t.Fatalf("got %s", b)
 	}
 }
+
+func TestPersistSelfImageSurvivesStagingCleanup(t *testing.T) {
+	t.Parallel()
+
+	staging := t.TempDir()
+	src := filepath.Join(staging, "captain-updater.exe")
+	if err := os.WriteFile(src, []byte("new-image"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := persistSelfImage(src, "captain-updater.exe")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() { _ = os.Remove(got) })
+
+	if err := os.RemoveAll(staging); err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := os.ReadFile(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(b) != "new-image" {
+		t.Fatalf("got %s", b)
+	}
+}

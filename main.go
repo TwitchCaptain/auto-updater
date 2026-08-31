@@ -14,7 +14,9 @@ import (
 
 	"github.com/TwitchCaptain/auto-updater/internal/config"
 	"github.com/TwitchCaptain/auto-updater/internal/history"
+	"github.com/TwitchCaptain/auto-updater/internal/host"
 	"github.com/TwitchCaptain/auto-updater/internal/paths"
+	"github.com/TwitchCaptain/auto-updater/internal/protocol"
 	"github.com/TwitchCaptain/auto-updater/internal/service"
 )
 
@@ -27,10 +29,13 @@ var appicon []byte
 func init() {
 	application.RegisterEvent[string]("open-app")
 	application.RegisterEvent[string]("history-updated")
+	application.RegisterEvent[string]("config-locked")
 	application.RegisterEvent[[]string]("files-dropped")
 }
 
 func main() {
+	_ = host.SetAppUserModelID()
+
 	cfgPath, err := paths.ConfigFile()
 	if err != nil {
 		log.Fatal(err)
@@ -69,7 +74,7 @@ func main() {
 			UniqueID: "com.twitchcaptain.updater",
 			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
 				for _, arg := range data.Args {
-					if strings.Contains(strings.ToLower(arg), "captainupdater://") {
+					if protocol.IsURL(arg) {
 						svc.HandleProtocol(arg)
 
 						return
@@ -112,7 +117,14 @@ func main() {
 
 	win.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
 		files := event.Context().DroppedFiles()
-		app.Event.Emit("files-dropped", files)
+		cleaned := make([]string, 0, len(files))
+		for _, f := range files {
+			if p := paths.CleanUserPath(f); p != "" {
+				cleaned = append(cleaned, p)
+			}
+		}
+
+		app.Event.Emit("files-dropped", cleaned)
 	})
 
 	tray := app.SystemTray.New()
@@ -145,7 +157,7 @@ func main() {
 	go watchActivate(svc)
 
 	for _, arg := range os.Args[1:] {
-		if strings.Contains(strings.ToLower(arg), "captainupdater://") {
+		if protocol.IsURL(arg) {
 			svc.HandleProtocol(arg)
 			win.Show()
 		}

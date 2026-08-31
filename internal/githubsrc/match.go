@@ -7,9 +7,20 @@ import (
 
 // Asset is a GitHub release asset we might download.
 type Asset struct {
-	Name string `json:"name"`
-	URL  string `json:"browser_download_url"`
-	Size int64  `json:"size"`
+	Name   string `json:"name"`
+	URL    string `json:"browser_download_url"`
+	APIURL string `json:"url"`
+	Size   int64  `json:"size"`
+}
+
+// DownloadURL is the URL to GET the bytes. Private repos need the API asset
+// URL plus a token; public repos can use the browser download URL.
+func (a Asset) DownloadURL(token string) string {
+	if token != "" && a.APIURL != "" {
+		return a.APIURL
+	}
+
+	return a.URL
 }
 
 var archTokens = map[string][]string{
@@ -67,7 +78,6 @@ func windowsCandidates(assets []Asset) []Asset {
 func isArchiveOrExe(name string) bool {
 	return strings.HasSuffix(name, ".zip") ||
 		strings.HasSuffix(name, ".exe") ||
-		strings.HasSuffix(name, ".7z") ||
 		strings.Contains(name, ".exe.")
 }
 
@@ -122,11 +132,25 @@ func containsToken(name string, tokens []string) bool {
 }
 
 func preferZip(assets []Asset) Asset {
+	portable := make([]Asset, 0, len(assets))
 	for _, a := range assets {
+		n := strings.ToLower(a.Name)
+		if strings.Contains(n, "installer") || strings.Contains(n, "setup") {
+			continue
+		}
+
+		portable = append(portable, a)
+	}
+
+	if len(portable) == 0 {
+		portable = assets
+	}
+
+	for _, a := range portable {
 		if strings.HasSuffix(strings.ToLower(a.Name), ".zip") {
 			return a
 		}
 	}
 
-	return assets[0]
+	return portable[0]
 }

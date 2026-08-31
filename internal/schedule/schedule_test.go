@@ -86,6 +86,72 @@ func TestNext(t *testing.T) {
 	}
 }
 
+func TestCanonicalTime(t *testing.T) {
+	t.Parallel()
+
+	if CanonicalTime("4:00") != "04:00" {
+		t.Fatal(CanonicalTime("4:00"))
+	}
+
+	if CanonicalTime("04:00:00") != "04:00" {
+		t.Fatal(CanonicalTime("04:00:00"))
+	}
+
+	slot := Slot{Days: []time.Weekday{time.Monday}, Time: "03:15:00", Action: ActionUpgrade}
+	if err := Validate([]Slot{slot}); err != nil {
+		t.Fatal(err)
+	}
+
+	mon := time.Date(2026, 8, 31, 3, 15, 0, 0, time.UTC)
+	if !Due(slot, mon) {
+		t.Fatal("seconds from <input type=time> must still match the minute")
+	}
+}
+
+func TestPrevious(t *testing.T) {
+	t.Parallel()
+
+	slot := Slot{
+		Days:   []time.Weekday{time.Saturday},
+		Time:   "10:00",
+		Action: ActionNotify,
+	}
+
+	at := time.Date(2026, 8, 29, 10, 0, 0, 0, time.UTC) // Saturday 10:00
+	prev, err := Previous(slot, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !prev.Equal(at) {
+		t.Fatalf("inclusive, got %s", prev)
+	}
+
+	after := time.Date(2026, 8, 29, 10, 1, 0, 0, time.UTC)
+	prev, err = Previous(slot, after)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !prev.Equal(at) {
+		t.Fatalf("want 10:00 same day, got %s", prev)
+	}
+
+	before := time.Date(2026, 8, 29, 9, 0, 0, 0, time.UTC)
+	prev, err = Previous(slot, before)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if prev.Weekday() != time.Saturday || prev.Hour() != 10 {
+		t.Fatalf("want last Saturday 10:00, got %s", prev)
+	}
+
+	if !prev.Before(before) {
+		t.Fatalf("expected previous week, got %s", prev)
+	}
+}
+
 func TestNextEach(t *testing.T) {
 	t.Parallel()
 

@@ -41,10 +41,32 @@ func IsSelf(exePath string) bool {
 		return false
 	}
 
-	a, _ := filepath.Abs(exePath)
-	b, _ := filepath.Abs(self)
+	return samePath(exePath, self)
+}
 
-	return strings.EqualFold(a, b)
+func samePath(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+
+	absA, errA := filepath.Abs(a)
+	absB, errB := filepath.Abs(b)
+	if errA == nil && errB == nil && strings.EqualFold(filepath.Clean(absA), filepath.Clean(absB)) {
+		return true
+	}
+
+	fa, err1 := os.Stat(a)
+	fb, err2 := os.Stat(b)
+	if err1 == nil && err2 == nil {
+		return os.SameFile(fa, fb)
+	}
+
+	return false
+}
+
+// RunningCount is how many other processes are this exe (not this PID).
+func RunningCount(path string) (int, error) {
+	return countMatching(path)
 }
 
 func WaitStopped(path string, d time.Duration) error {
@@ -65,30 +87,56 @@ func WaitStopped(path string, d time.Duration) error {
 	return fmt.Errorf("process still running: %s", filepath.Base(path))
 }
 
-func ElevateCopy(ctx context.Context, src, dest string) error {
-	return elevateCopy(ctx, src, dest)
-}
-
-// CanWrite reports whether destDir (or its parent) is writable by this process.
-func CanWrite(destDir string) bool {
-	return canWrite(destDir)
+// FileCopy is one src → dest pair for PlaceMany.
+type FileCopy struct {
+	Src  string
+	Dest string
 }
 
 // Place copies src onto dest, elevating with UAC when the dest is not writable.
 func Place(ctx context.Context, src, dest string) error {
-	if !CanWrite(filepath.Dir(dest)) {
-		return ElevateCopy(ctx, src, dest)
-	}
+	return PlaceMany(ctx, []FileCopy{{Src: src, Dest: dest}})
+}
 
-	if err := copyOverwrite(src, dest); err != nil {
-		if isAccess(err) {
-			return ElevateCopy(ctx, src, dest)
+// PlaceMany copies files, prompting UAC at most once for the whole batch.
+func PlaceMany(ctx context.Context, files []FileCopy) error {
+	var elevate []FileCopy
+
+	for _, f := range files {
+		if f.Src == "" || f.Dest == "" {
+			continue
 		}
 
-		return err
+		if !CanWrite(filepath.Dir(f.Dest)) {
+			elevate = append(elevate, f)
+
+			continue
+		}
+
+		if err := copyOverwrite(f.Src, f.Dest); err != nil {
+			if isAccess(err) {
+				elevate = append(elevate, f)
+
+				continue
+			}
+
+			return err
+		}
 	}
 
-	return nil
+	if len(elevate) == 0 {
+		return nil
+	}
+
+	return ElevateCopyMany(ctx, elevate)
+}
+
+func ElevateCopy(ctx context.Context, src, dest string) error {
+	return ElevateCopyMany(ctx, []FileCopy{{Src: src, Dest: dest}})
+}
+
+func ElevateCopyMany(ctx context.Context, files []FileCopy) error {
+	return elevateCopyMany(ctx, files)
 }
 
 func copyOverwrite(src, dest string) error {
@@ -143,6 +191,11 @@ func canWrite(dir string) bool {
 	return true
 }
 
+// CanWrite reports whether destDir (or its parent) is writable by this process.
+func CanWrite(destDir string) bool {
+	return canWrite(destDir)
+}
+
 // FindService returns a Windows service name whose image path is exe, if any.
 func FindService(exe string) string {
 	return findService(exe)
@@ -159,4 +212,9 @@ func StartService(name string) error {
 // ScheduleReplace replaces dest with src after this process exits (self-update).
 func ScheduleReplace(src, dest string) error {
 	return scheduleReplace(src, dest)
+}
+
+// HasStartup reports whether the current-user Startup folder has our shortcut.
+func HasStartup() bool {
+	return hasStartup()
 }

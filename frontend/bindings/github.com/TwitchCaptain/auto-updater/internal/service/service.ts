@@ -45,6 +45,15 @@ export function CheckNow(id: string): $CancellablePromise<$models.CheckResult | 
     });
 }
 
+/**
+ * ConsumePendingOpen returns (and clears) an app id from a protocol launch
+ * (toast click or second instance). The frontend calls this after it is mounted
+ * because the first-launch event is emitted before WebView2 is ready.
+ */
+export function ConsumePendingOpen(): $CancellablePromise<string> {
+    return $Call.ByID(2241266407);
+}
+
 export function DeleteApp(id: string): $CancellablePromise<void> {
     return $Call.ByID(1306349344, id);
 }

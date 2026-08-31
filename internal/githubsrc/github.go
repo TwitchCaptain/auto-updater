@@ -52,7 +52,7 @@ func (c *Client) token() string {
 
 // Latest fetches /repos/{ownerRepo}/releases/latest and selects an asset.
 func (c *Client) Latest(ctx context.Context, ownerRepo, hostArch string) (*Release, error) {
-	ownerRepo = strings.Trim(strings.TrimSpace(ownerRepo), "/")
+	ownerRepo = NormalizeRepo(ownerRepo)
 	if ownerRepo == "" || !strings.Contains(ownerRepo, "/") {
 		return nil, errors.New("owner/repo required")
 	}
@@ -108,24 +108,61 @@ func Newer(remote, local string) bool {
 	r := canon(remote)
 	l := canon(local)
 	if !semver.IsValid(r) || !semver.IsValid(l) {
-		return strings.TrimPrefix(remote, "v") != strings.TrimPrefix(local, "v") && remote != "" && local != "" &&
-			semver.Compare(r, l) > 0
+		rs := strings.TrimPrefix(r, "v")
+		ls := strings.TrimPrefix(l, "v")
+
+		return rs != ls && remote != "" && semver.Compare(r, l) > 0
 	}
 
 	return semver.Compare(r, l) > 0
 }
 
+// Display is the three-digit form used for last-applied / UI (strips a Windows
+// PE fourth number and a leading v).
+func Display(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return ""
+	}
+
+	return strings.TrimPrefix(canon(v), "v")
+}
+
 func canon(v string) string {
 	v = strings.TrimSpace(v)
+	v = strings.TrimPrefix(v, "v")
+	v = strings.TrimPrefix(v, "V")
 	if v == "" {
 		return "v0.0.0"
 	}
 
-	if !strings.HasPrefix(v, "v") {
-		v = "v" + v
+	main, meta := splitMeta(v)
+	parts := strings.Split(main, ".")
+	for len(parts) < 3 {
+		parts = append(parts, "0")
 	}
 
-	return v
+	if len(parts) > 3 {
+		parts = parts[:3]
+	}
+
+	return "v" + strings.Join(parts, ".") + meta
+}
+
+func splitMeta(v string) (main, meta string) {
+	build := ""
+	if i := strings.Index(v, "+"); i >= 0 {
+		build = v[i:]
+		v = v[:i]
+	}
+
+	pre := ""
+	if i := strings.Index(v, "-"); i >= 0 {
+		pre = v[i:]
+		v = v[:i]
+	}
+
+	return v, pre + build
 }
 
 func truncate(s string, n int) string {
