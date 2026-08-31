@@ -38,7 +38,7 @@ func testStore(t *testing.T, slot schedule.Slot) *config.Store {
 func TestCatchUpMissedSlot(t *testing.T) {
 	t.Parallel()
 
-	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.Local)
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
 	slot := schedule.Slot{
 		Days:   []time.Weekday{now.Weekday()},
 		Time:   "03:15",
@@ -76,7 +76,7 @@ func TestCatchUpMissedSlot(t *testing.T) {
 func TestCatchUpSkipsWhenHandled(t *testing.T) {
 	t.Parallel()
 
-	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.Local)
+	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
 	slot := schedule.Slot{
 		Days:   []time.Weekday{now.Weekday()},
 		Time:   "03:15",
@@ -97,7 +97,7 @@ func TestCatchUpSkipsWhenHandled(t *testing.T) {
 func TestCatchUpLeavesCurrentMinuteToTick(t *testing.T) {
 	t.Parallel()
 
-	now := time.Date(2026, 8, 30, 3, 15, 20, 0, time.Local)
+	now := time.Date(2026, 8, 30, 3, 15, 20, 0, time.UTC)
 	slot := schedule.Slot{
 		Days:   []time.Weekday{now.Weekday()},
 		Time:   "03:15",
