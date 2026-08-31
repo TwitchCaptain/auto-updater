@@ -18,13 +18,13 @@ Portable zips (`captain-updater.<arch>.exe.zip`) are also published. WebView2 is
 Each row is one GitHub repo, one downloaded asset, and up to five weekly schedules.
 
 1. **Add**, or pick a template (autobrr, unpackerr, or Captain Updater itself).
-2. Point at the **primary exe** (browse or drag-and-drop). Optional `.lnk` is parsed for Target / Args / Working Directory and used to start the app after an upgrade.
+2. Point at the **primary exe** (browse or drag-and-drop). Optional `.lnk` is parsed for Target / Args / Working Directory and used to start the app after an upgrade. Zip members like `unpackerr.amd64.exe` are renamed to that primary name.
 3. List **extra files** to copy from the same zip (filenames or globs). autobrr is one app: primary `autobrr.exe`, extra `autobrrctl.exe`.
 4. Save, then **Check now** / **Upgrade**, or schedule them.
 
 Version is taken from an optional HTTP JSON field, then the PE ProductVersion of the primary exe (FileVersion's fourth number is a git revision, not the GitHub tag), then `exe -v` / `--version`, then the last version Captain Updater applied. autobrr uses the HTTP API (`/api/config` → `version`); `autobrr.exe` has no `-v` flag (`autobrrctl version` does).
 
-**Notify** shows a sticky toast. Click it to focus this window on that app’s Upgrade button (`captainupdater://app/<id>`).
+**Notify** shows a sticky toast. Click it to focus this window on that app’s Upgrade button (`captainupdater://app/<id>`). If the tray app was quit over a scheduled minute, the most recent missed Upgrade or Notify runs once at the next start (skipped when history already recorded that occurrence).
 
 Upgrade elevates with UAC only when the target directory is not writable. Self-update stages a new image and restarts.
 

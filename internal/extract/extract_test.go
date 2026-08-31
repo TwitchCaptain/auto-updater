@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -89,6 +90,76 @@ func TestFromZipUsesDestExeCasing(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(dest, "app.exe")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestFromZipArchSuffixedPrimary(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	zpath := filepath.Join(dir, "unpackerr.amd64.exe.zip")
+	if err := writeZip(zpath, map[string]string{
+		"unpackerr.amd64.exe":    "payload",
+		"unpackerr.conf.example": "conf",
+		"README.html":            "doc",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := filepath.Join(dir, "out")
+	got, err := FromZip(zpath, dest, filepath.Join(dest, "unpackerr.exe"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 1 || filepath.Base(got[0]) != "unpackerr.exe" {
+		t.Fatalf("wrote %v", got)
+	}
+
+	b, err := os.ReadFile(filepath.Join(dest, "unpackerr.exe"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(b) != "payload" {
+		t.Fatalf("got %s", b)
+	}
+}
+
+func TestFromZipPrefersHostArch(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	zpath := filepath.Join(dir, "both.zip")
+	if err := writeZip(zpath, map[string]string{
+		"app.amd64.exe": "amd",
+		"app.arm64.exe": "arm",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := filepath.Join(dir, "out")
+	got, err := FromZip(zpath, dest, "app.exe", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 1 || filepath.Base(got[0]) != "app.exe" {
+		t.Fatalf("wrote %v", got)
+	}
+
+	b, err := os.ReadFile(filepath.Join(dest, "app.exe"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "amd"
+	if runtime.GOARCH == "arm64" {
+		want = "arm"
+	}
+
+	if string(b) != want {
+		t.Fatalf("GOARCH=%s got %s want %s", runtime.GOARCH, b, want)
 	}
 }
 

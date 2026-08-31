@@ -68,6 +68,7 @@ func New(store *config.Store, hist *history.Log) *Service {
 		eng:   &upgrade.Engine{GH: &githubsrc.Client{}},
 	}
 	s.sched = scheduler.New(store, s.onSlot)
+	s.sched.Handled = s.slotHandled
 
 	return s
 }
@@ -384,6 +385,30 @@ func (s *Service) HandleProtocol(raw string) {
 	s.show(id)
 }
 
+func (s *Service) slotHandled(app config.App, slot schedule.Slot, dueAt time.Time) bool {
+	events, err := s.hist.Tail(0)
+	if err != nil {
+		return false
+	}
+
+	want := history.ActionUpgrade
+	if slot.Action == schedule.ActionNotify {
+		want = history.ActionNotify
+	}
+
+	for _, ev := range events {
+		if ev.AppID != app.ID || ev.Action != want {
+			continue
+		}
+
+		if !ev.Time.Before(dueAt) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (s *Service) onSlot(app config.App, slot schedule.Slot) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
@@ -399,6 +424,12 @@ func (s *Service) onSlot(app config.App, slot schedule.Slot) {
 		}
 
 		if !res.Newer {
+			_ = s.hist.Append(history.Event{
+				AppID: app.ID, AppName: app.Name, Action: history.ActionNotify,
+				From: res.Local, To: res.Remote, Asset: res.AssetName, Result: "current",
+			})
+			s.emitHistory()
+
 			return
 		}
 

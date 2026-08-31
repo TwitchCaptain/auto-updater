@@ -96,6 +96,30 @@ func Due(slot Slot, now time.Time) bool {
 	return now.Hour() == h && now.Minute() == m
 }
 
+// Previous is the most recent fire at or before `from` (inclusive if currently due).
+func Previous(slot Slot, from time.Time) (time.Time, error) {
+	h, m, err := slot.hourMinute()
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	if len(slot.Days) == 0 {
+		return time.Time{}, errors.New("no days")
+	}
+
+	t := from.Truncate(time.Minute)
+
+	for range 8 * 24 * 60 {
+		if Due(slot, t) && t.Hour() == h && t.Minute() == m {
+			return t, nil
+		}
+
+		t = t.Add(-time.Minute)
+	}
+
+	return time.Time{}, errors.New("no previous run")
+}
+
 // Next after `from` (exclusive of the current minute if already due).
 func Next(slot Slot, from time.Time) (time.Time, error) {
 	h, m, err := slot.hourMinute()

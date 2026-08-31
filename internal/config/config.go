@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -93,6 +94,7 @@ func (s *Store) Detect() error {
 		return err
 	}
 
+	raw = bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF})
 	s.enc = crypt.IsEncrypted(raw)
 	if s.enc {
 		return nil
@@ -110,6 +112,7 @@ func (s *Store) Unlock(password string) error {
 		return err
 	}
 
+	raw = bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF})
 	if !crypt.IsEncrypted(raw) {
 		return errors.New("config is not encrypted")
 	}

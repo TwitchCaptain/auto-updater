@@ -39,6 +39,25 @@ func TestPlainRoundTrip(t *testing.T) {
 	}
 }
 
+func TestDetectStripsUTF8BOM(t *testing.T) {
+	t.Parallel()
+
+	p := filepath.Join(t.TempDir(), "config.json")
+	body := []byte("{\"startWithWindows\":false,\"apps\":[{\"name\":\"x\",\"ownerRepo\":\"o/r\",\"exePath\":\"c:\\\\x.exe\"}]}\n")
+	if err := os.WriteFile(p, append([]byte{0xEF, 0xBB, 0xBF}, body...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	s := New(p)
+	if err := s.Detect(); err != nil {
+		t.Fatal(err)
+	}
+
+	if s.Settings().Apps[0].Name != "x" {
+		t.Fatal(s.Settings())
+	}
+}
+
 func TestSanitizeOnSave(t *testing.T) {
 	t.Parallel()
 

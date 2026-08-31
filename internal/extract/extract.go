@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -134,6 +135,13 @@ func selectMembers(zpath, destExe string, extra []string) (map[string]bool, erro
 			}
 		}
 
+		if !matched {
+			if alt := pickArchMember(names, p); alt != "" {
+				want[strings.ToLower(alt)] = true
+				matched = true
+			}
+		}
+
 		if !matched && !hasMeta(p) {
 			want[strings.ToLower(fileBase(p))] = true
 		} else if !matched {
@@ -145,10 +153,14 @@ func selectMembers(zpath, destExe string, extra []string) (map[string]bool, erro
 }
 
 // outputBase keeps the user's primary exe name (and casing) when the zip
-// member is that exe under a different case, which Windows treats as the same file.
+// member is that exe under a different case or an arch infix (unpackerr.amd64.exe).
 func outputBase(zipBase, destExe string) string {
 	destBase := fileBase(destExe)
-	if destBase != "" && destBase != "." && nameMatch(destExe, zipBase) {
+	if destBase == "" || destBase == "." {
+		return zipBase
+	}
+
+	if nameMatch(destExe, zipBase) || archSuffixed(destBase, zipBase) {
 		return destBase
 	}
 
@@ -169,6 +181,122 @@ func nameMatch(pattern, name string) bool {
 
 func hasMeta(pattern string) bool {
 	return strings.ContainsAny(fileBase(pattern), "*?[")
+}
+
+var archTokens = map[string]bool{
+	"amd64": true, "x86_64": true, "x64": true, "win64": true, "windows64": true,
+	"arm64": true, "aarch64": true,
+	"386": true, "i386": true, "i686": true, "win32": true, "x86": true,
+	"armv7": true, "armhf": true, "armv6": true, "arm": true,
+}
+
+func pickArchMember(names []string, dest string) string {
+	if hasMeta(dest) {
+		return ""
+	}
+
+	var hits []string
+	for _, n := range names {
+		if archSuffixed(fileBase(dest), n) {
+			hits = append(hits, n)
+		}
+	}
+
+	if len(hits) == 0 {
+		return ""
+	}
+
+	return preferHostArch(hits)
+}
+
+func archSuffixed(destBase, zipBase string) bool {
+	dest := strings.ToLower(fileBase(destBase))
+	zipName := strings.ToLower(fileBase(zipBase))
+	dext := path.Ext(dest)
+	zext := path.Ext(zipName)
+	if dext == "" || dext != zext {
+		return false
+	}
+
+	stem := strings.TrimSuffix(dest, dext)
+	zipStem := strings.TrimSuffix(zipName, zext)
+	if stem == "" || zipStem == stem || !strings.HasPrefix(zipStem, stem) {
+		return false
+	}
+
+	rest := zipStem[len(stem):]
+	if rest == "" {
+		return false
+	}
+
+	switch rest[0] {
+	case '.', '_', '-':
+		rest = rest[1:]
+	default:
+		return false
+	}
+
+	return isArchSuffix(rest)
+}
+
+func isArchSuffix(rest string) bool {
+	rest = strings.ToLower(rest)
+	rest = strings.ReplaceAll(rest, "-", ".")
+	rest = strings.ReplaceAll(rest, "_", ".")
+	parts := strings.Split(rest, ".")
+	sawArch := false
+
+	for _, p := range parts {
+		if p == "" || p == "windows" || p == "win" {
+			continue
+		}
+
+		if !archTokens[p] {
+			return false
+		}
+
+		sawArch = true
+	}
+
+	return sawArch
+}
+
+func preferHostArch(names []string) string {
+	tokens := hostArchTokens()
+	for _, tok := range tokens {
+		for _, n := range names {
+			if containsArchToken(strings.ToLower(n), tok) {
+				return n
+			}
+		}
+	}
+
+	return names[0]
+}
+
+func hostArchTokens() []string {
+	switch runtime.GOARCH {
+	case "amd64":
+		return []string{"amd64", "x86_64", "x64", "win64"}
+	case "arm64":
+		return []string{"arm64", "aarch64"}
+	case "386":
+		return []string{"386", "i386", "i686", "win32"}
+	default:
+		return []string{runtime.GOARCH}
+	}
+}
+
+func containsArchToken(name, tok string) bool {
+	if tok == "x86" && strings.Contains(name, "x86_64") {
+		return false
+	}
+
+	if tok == "arm" && (strings.Contains(name, "arm64") || strings.Contains(name, "aarch64")) {
+		return false
+	}
+
+	return strings.Contains(name, tok)
 }
 
 func fileBase(name string) string {

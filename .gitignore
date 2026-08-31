@@ -19,3 +19,5 @@ build/android/gen/
 *.exe
 *.syso
 .DS_Store
+.gotmp/
+.gocache/
