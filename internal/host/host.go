@@ -23,6 +23,15 @@ func Stop(path string) error {
 	return stop(path)
 }
 
+// RevealDir opens the folder in Explorer (or the platform equivalent).
+func RevealDir(dir string) error {
+	if dir == "" {
+		return errors.New("empty path")
+	}
+
+	return revealDir(dir)
+}
+
 func Start(ctx context.Context, exe, shortcut string) error {
 	if shortcut != "" {
 		return startPath(ctx, shortcut)

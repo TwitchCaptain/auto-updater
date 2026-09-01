@@ -8,5 +8,6 @@ export {
 
 export {
     CheckResult,
+    DataPaths,
     UpcomingItem
 } from "./models.js";

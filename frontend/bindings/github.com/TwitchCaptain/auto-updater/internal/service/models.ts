@@ -64,6 +64,38 @@ export class CheckResult {
 }
 
 /**
+ * DataPaths is where config and history live on disk.
+ */
+export class DataPaths {
+    "dir": string;
+    "config": string;
+    "history": string;
+
+    /** Creates a new DataPaths instance. */
+    constructor($$source: Partial<DataPaths> = {}) {
+        if (!("dir" in $$source)) {
+            this["dir"] = "";
+        }
+        if (!("config" in $$source)) {
+            this["config"] = "";
+        }
+        if (!("history" in $$source)) {
+            this["history"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new DataPaths instance from a string or object.
+     */
+    static createFrom($$source: any = {}): DataPaths {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new DataPaths($$parsedSource as Partial<DataPaths>);
+    }
+}
+
+/**
  * UpcomingItem is the next fire of one enabled app schedule.
  */
 export class UpcomingItem {

@@ -8,6 +8,7 @@ import type { Events } from "@wailsio/runtime";
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "config-locked": string;
             "files-dropped": string[];
             "history-updated": string;
             "open-app": string;

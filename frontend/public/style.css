@@ -11,3 +11,38 @@ body {
   font-weight: 600;
   text-decoration: underline;
 }
+
+.cu-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.cu-chrome .navbar {
+  margin-bottom: 0;
+}
+
+.cu-status {
+  background: var(--bs-dark);
+  border-bottom: 1px solid var(--bs-border-color);
+  padding: 0.5rem 1rem;
+}
+
+.cu-status .alert {
+  margin-bottom: 0;
+}
+
+.cu-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: var(--bs-body-bg);
+  border-top: 1px solid var(--bs-border-color);
+  padding: 0.75rem 1rem;
+}
+
+.cu-path {
+  font-family: var(--bs-font-monospace);
+  font-size: 0.85rem;
+  word-break: break-all;
+}

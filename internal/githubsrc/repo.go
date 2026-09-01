@@ -11,9 +11,6 @@ func NormalizeRepo(s string) string {
 		return ""
 	}
 
-	s = strings.TrimSuffix(s, ".git")
-	s = strings.TrimRight(s, "/")
-
 	if strings.HasPrefix(s, "git@") {
 		if i := strings.Index(s, ":"); i >= 0 {
 			s = s[i+1:]
@@ -22,6 +19,7 @@ func NormalizeRepo(s string) string {
 
 	lower := strings.ToLower(s)
 	for _, prefix := range []string{
+		"git+https://github.com/",
 		"https://github.com/",
 		"http://github.com/",
 		"https://www.github.com/",
@@ -35,11 +33,30 @@ func NormalizeRepo(s string) string {
 		}
 	}
 
+	if i := strings.IndexAny(s, "?#"); i >= 0 {
+		s = s[:i]
+	}
+
+	s = strings.Trim(s, "/")
+	s = strings.TrimSuffix(s, ".git")
 	s = strings.Trim(s, "/")
 	parts := strings.Split(s, "/")
 	if len(parts) >= 2 && parts[0] != "" && parts[1] != "" {
-		return parts[0] + "/" + parts[1]
+		name := strings.TrimSuffix(parts[1], ".git")
+
+		return parts[0] + "/" + name
 	}
 
 	return s
+}
+
+// ValidRepo is true for owner/name after NormalizeRepo.
+func ValidRepo(s string) bool {
+	s = NormalizeRepo(s)
+	parts := strings.Split(s, "/")
+	if len(parts) != 2 {
+		return false
+	}
+
+	return parts[0] != "" && parts[1] != "" && !strings.ContainsAny(s, " \t")
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"github.com/TwitchCaptain/auto-updater/internal/backup"
 	"github.com/TwitchCaptain/auto-updater/internal/config"
 	"github.com/TwitchCaptain/auto-updater/internal/extract"
 	"github.com/TwitchCaptain/auto-updater/internal/githubsrc"
@@ -182,9 +183,91 @@ func (s *Service) PreviewGitHub(ownerRepo string) (*githubsrc.Release, error) {
 		return nil, err
 	}
 
+	ownerRepo = githubsrc.NormalizeRepo(ownerRepo)
+	if !githubsrc.ValidRepo(ownerRepo) {
+		return nil, errors.New("enter owner/name or paste a GitHub URL")
+	}
+
 	s.eng.GH.Token = s.store.Settings().GitHubToken
 
 	return s.eng.GH.Latest(context.Background(), ownerRepo, runtime.GOARCH)
+}
+
+func (s *Service) NormalizeRepo(ownerRepo string) string {
+	return githubsrc.NormalizeRepo(ownerRepo)
+}
+
+// DataPaths is where config and history live on disk.
+type DataPaths struct {
+	Dir     string `json:"dir"`
+	Config  string `json:"config"`
+	History string `json:"history"`
+}
+
+func (s *Service) DataPaths() (DataPaths, error) {
+	dir, err := paths.Dir()
+	if err != nil {
+		return DataPaths{}, err
+	}
+
+	cfg, err := paths.ConfigFile()
+	if err != nil {
+		return DataPaths{}, err
+	}
+
+	hist, err := paths.HistoryFile()
+	if err != nil {
+		return DataPaths{}, err
+	}
+
+	return DataPaths{Dir: dir, Config: cfg, History: hist}, nil
+}
+
+func (s *Service) OpenDataDir() error {
+	dir, err := paths.Dir()
+	if err != nil {
+		return err
+	}
+
+	return host.RevealDir(dir)
+}
+
+func (s *Service) ExportBackup() (string, error) {
+	if s.app == nil {
+		return "", errors.New("app not ready")
+	}
+
+	dlg := s.app.Dialog.SaveFile().
+		SetMessage("Export Captain Updater backup").
+		SetFilename("captain-updater-backup.zip").
+		AddFilter("Zip archive", "*.zip")
+	if s.win != nil {
+		dlg = dlg.AttachToWindow(s.win)
+	}
+	dest, _ := dlg.PromptForSingleSelection()
+	if dest == "" {
+		return "", nil
+	}
+
+	if !strings.HasSuffix(strings.ToLower(dest), ".zip") {
+		dest += ".zip"
+	}
+
+	cfg, err := paths.ConfigFile()
+	if err != nil {
+		return "", err
+	}
+
+	hist, err := paths.HistoryFile()
+	if err != nil {
+		return "", err
+	}
+
+	if err := backup.Zip(dest, cfg, hist); err != nil {
+		return "", err
+	}
+
+	return dest, nil
 }
 
 func (s *Service) WouldWrite(exePath string, extra []string) []string {
@@ -254,6 +337,16 @@ func (s *Service) UpgradeNow(id string) (*CheckResult, error) {
 		s.emitHistory()
 
 		return nil, err
+	}
+
+	if !res.Newer {
+		_ = s.hist.Append(history.Event{
+			AppID: app.ID, AppName: app.Name, Action: history.ActionUpgrade,
+			From: res.Local, To: res.Remote, Asset: res.AssetName, Result: "current",
+		})
+		s.emitHistory()
+
+		return &CheckResult{Result: *res, AppID: id}, nil
 	}
 
 	_ = s.store.SetLastVersion(app.ID, githubsrc.Display(res.Remote))

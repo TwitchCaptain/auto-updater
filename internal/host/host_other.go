@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/shirou/gopsutil/v4/process"
@@ -69,6 +70,14 @@ func countMatching(path string) (int, error) {
 
 func ParseShortcut(_ string) (Shortcut, error) {
 	return Shortcut{}, errors.New("shortcuts are Windows-only")
+}
+
+func revealDir(dir string) error {
+	if runtime.GOOS == "darwin" {
+		return exec.Command("open", dir).Start()
+	}
+
+	return exec.Command("xdg-open", dir).Start()
 }
 
 func startPath(ctx context.Context, path string) error {

@@ -196,6 +196,12 @@ func countMatching(path string) (int, error) {
 	return n, nil
 }
 
+func revealDir(dir string) error {
+	cmd := exec.Command("explorer.exe", dir)
+
+	return cmd.Start()
+}
+
 func startPath(_ context.Context, path string) error {
 	file, err := windows.UTF16PtrFromString(path)
 	if err != nil {

@@ -54,6 +54,12 @@ export function ConsumePendingOpen(): $CancellablePromise<string> {
     return $Call.ByID(2241266407);
 }
 
+export function DataPaths(): $CancellablePromise<$models.DataPaths> {
+    return $Call.ByID(61907354).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
 export function DeleteApp(id: string): $CancellablePromise<void> {
     return $Call.ByID(1306349344, id);
 }
@@ -70,15 +76,19 @@ export function Encrypted(): $CancellablePromise<boolean> {
     return $Call.ByID(135570830);
 }
 
+export function ExportBackup(): $CancellablePromise<string> {
+    return $Call.ByID(2485334514);
+}
+
 export function GetConfig(): $CancellablePromise<config$0.Settings> {
     return $Call.ByID(923510764).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
 export function History(limit: number): $CancellablePromise<history$0.Event[]> {
     return $Call.ByID(2692803822, limit).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType6($result);
     });
 }
 
@@ -98,21 +108,29 @@ export function NeedsUnlock(): $CancellablePromise<boolean> {
     return $Call.ByID(585638023);
 }
 
+export function NormalizeRepo(ownerRepo: string): $CancellablePromise<string> {
+    return $Call.ByID(2966990277, ownerRepo);
+}
+
+export function OpenDataDir(): $CancellablePromise<void> {
+    return $Call.ByID(4112596061);
+}
+
 export function ParseShortcut(path: string): $CancellablePromise<host$0.Shortcut> {
     return $Call.ByID(1655394423, path).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType7($result);
     });
 }
 
 export function Presets(): $CancellablePromise<preset$0.Info[]> {
     return $Call.ByID(1384801202).then(($result: any) => {
-        return $$createType8($result);
+        return $$createType9($result);
     });
 }
 
 export function PreviewGitHub(ownerRepo: string): $CancellablePromise<githubsrc$0.Release | null> {
     return $Call.ByID(3375784449, ownerRepo).then(($result: any) => {
-        return $$createType10($result);
+        return $$createType11($result);
     });
 }
 
@@ -144,7 +162,7 @@ export function Unlock(password: string): $CancellablePromise<void> {
 
 export function Upcoming(): $CancellablePromise<$models.UpcomingItem[]> {
     return $Call.ByID(3613454320).then(($result: any) => {
-        return $$createType12($result);
+        return $$createType13($result);
     });
 }
 
@@ -156,7 +174,7 @@ export function UpgradeNow(id: string): $CancellablePromise<$models.CheckResult 
 
 export function WouldWrite(exePath: string, extra: string[]): $CancellablePromise<string[]> {
     return $Call.ByID(834107566, exePath, extra).then(($result: any) => {
-        return $$createType13($result);
+        return $$createType14($result);
     });
 }
 
@@ -164,14 +182,15 @@ export function WouldWrite(exePath: string, extra: string[]): $CancellablePromis
 const $$createType0 = config$0.App.createFrom;
 const $$createType1 = $models.CheckResult.createFrom;
 const $$createType2 = $Create.Nullable($$createType1);
-const $$createType3 = config$0.Settings.createFrom;
-const $$createType4 = history$0.Event.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = host$0.Shortcut.createFrom;
-const $$createType7 = preset$0.Info.createFrom;
-const $$createType8 = $Create.Array($$createType7);
-const $$createType9 = githubsrc$0.Release.createFrom;
-const $$createType10 = $Create.Nullable($$createType9);
-const $$createType11 = $models.UpcomingItem.createFrom;
-const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = $Create.Array($Create.Any);
+const $$createType3 = $models.DataPaths.createFrom;
+const $$createType4 = config$0.Settings.createFrom;
+const $$createType5 = history$0.Event.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = host$0.Shortcut.createFrom;
+const $$createType8 = preset$0.Info.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = githubsrc$0.Release.createFrom;
+const $$createType11 = $Create.Nullable($$createType10);
+const $$createType12 = $models.UpcomingItem.createFrom;
+const $$createType13 = $Create.Array($$createType12);
+const $$createType14 = $Create.Array($Create.Any);

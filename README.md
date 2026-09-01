@@ -32,7 +32,10 @@ Upgrade elevates with UAC only when the target directory is not writable. Self-u
 
 - Optional GitHub token (rate limits / private repos).
 - Start with Windows.
+- Config and history paths on disk, **Open folder**, and **Export backup** (zip of `config.json` + `history.jsonl`).
 - Optional password on `config.json` (Argon2id + AES-256-GCM). The activity log stays plaintext. A forgotten password means resetting config, not the log.
+
+A pasted GitHub URL in the repo field is stored as `owner/name`. Check and Upgrade report success or “already up to date” in the bar under the nav so you do not have to scroll.
 
 ## Develop
 
