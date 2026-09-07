@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/google/uuid v1.6.0
 	github.com/shirou/gopsutil/v4 v4.26.7
-	github.com/wailsapp/wails/v3 v3.0.0-beta.16
+	github.com/wailsapp/wails/v3 v3.0.0-beta.17
 	golang.org/x/crypto v0.55.0
 	golang.org/x/mod v0.40.0
 	golang.org/x/sys v0.47.0
