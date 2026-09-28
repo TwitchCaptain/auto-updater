@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/google/uuid v1.6.0
 	github.com/shirou/gopsutil/v4 v4.26.7
-	github.com/wailsapp/wails/v3 v3.0.0-beta.16
+	github.com/wailsapp/wails/v3 v3.0.0-beta.26
 	golang.org/x/crypto v0.55.0
 	golang.org/x/mod v0.40.0
 	golang.org/x/sys v0.47.0
@@ -17,7 +17,6 @@ require (
 	github.com/ebitengine/purego v0.10.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
-	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20260802145828-341c2f0c90b5 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
