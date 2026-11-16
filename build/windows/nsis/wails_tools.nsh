@@ -5,22 +5,19 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "auto-updater"
+    !define INFO_PROJECTNAME ""
 !endif
 !ifndef INFO_COMPANYNAME
-    !define INFO_COMPANYNAME "TwitchCaptain"
+    !define INFO_COMPANYNAME "My Company"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "Captain Updater"
+    !define INFO_PRODUCTNAME "My Product"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "0.1.2"
-!endif
-!ifndef INFO_FILEVERSION
-    !define INFO_FILEVERSION "${INFO_PRODUCTVERSION}.0"
+    !define INFO_PRODUCTVERSION "0.1.0"
 !endif
 !ifndef INFO_COPYRIGHT
-    !define INFO_COPYRIGHT "Copyright TwitchCaptain"
+    !define INFO_COPYRIGHT "© now, My Company"
 !endif
 !ifndef PRODUCT_EXECUTABLE
     !define PRODUCT_EXECUTABLE "${INFO_PROJECTNAME}.exe"
@@ -173,6 +170,7 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
 # Install webview2 by launching the bootstrapper
 # See https://docs.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution#online-only-deployment
 !macro wails.webview2runtime
+    !ifndef WAILS_SKIP_WEBVIEW2
     !ifndef WAILS_INSTALL_WEBVIEW_DETAILPRINT
         !define WAILS_INSTALL_WEBVIEW_DETAILPRINT "Installing: WebView2 Runtime"
     !endif
@@ -204,6 +202,7 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
     
     SetDetailsPrint both
     ok:
+    !endif
 !macroend
 
 # Copy of APP_ASSOCIATE and APP_UNASSOCIATE macros from here https://gist.github.com/nikku/281d0ef126dbc215dd58bfd5b3a5cd5b
@@ -239,14 +238,14 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
     
 !macroend
 
-!macro CUSTOM_PROTOCOL_ASSOCIATE PROTOCOL DESCRIPTION ICON
+!macro CUSTOM_PROTOCOL_ASSOCIATE PROTOCOL DESCRIPTION ICON COMMAND
   DeleteRegKey SHELL_CONTEXT "Software\Classes\${PROTOCOL}"
   WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}" "" "${DESCRIPTION}"
   WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}" "URL Protocol" ""
   WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}\DefaultIcon" "" "${ICON}"
   WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}\shell" "" ""
   WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}\shell\open" "" ""
-  WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}\shell\open\command" "" '"$INSTDIR\${PRODUCT_EXECUTABLE}" "%1"'
+  WriteRegStr SHELL_CONTEXT "Software\Classes\${PROTOCOL}\shell\open\command" "" "${COMMAND}"
 !macroend
 
 !macro CUSTOM_PROTOCOL_UNASSOCIATE PROTOCOL
